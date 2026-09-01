@@ -883,6 +883,39 @@ header {
   height: 100%;
   object-fit: cover;
 }
+.upload-wrap {
+  position: relative;
+}
+.upload-wrap .upload {
+  width: 100%;
+}
+.image-download {
+  position: absolute;
+  inset-inline-end: 12px;
+  bottom: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #ffffff66;
+  border-radius: 10px;
+  background: #101820d9;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+.image-download:hover {
+  background: #007aff;
+}
+.image-download svg {
+  width: 17px;
+  height: 17px;
+}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

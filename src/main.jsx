@@ -23,6 +23,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   Clock3,
+  Download,
   ImagePlus,
   LayoutDashboard,
   Languages,
@@ -83,6 +84,7 @@ const enMap = {
   "ژورنال حرفه‌ای معامله‌گری": "Professional trading journal",
   "بازار باز است": "Market is open",
   "ثبت معامله": "Add trade",
+  "دانلود عکس": "Download image",
   "جستجو در معاملات...": "Search trades...",
   "موجودی حساب": "Account balance",
   "سود خالص ماه": "Monthly net P&L",
@@ -1855,18 +1857,31 @@ function TradeModal({ trade, onSave, onDelete, onClose }) {
           </button>
         </div>
         <div className="modal-body">
-          <label className="wide upload">
-            {f.image ? (
-              <img src={f.image} />
-            ) : (
-              <>
-                <ImagePlus />
-                <b>اسکرین‌شات چارت</b>
-                <small>برای انتخاب تصویر کلیک کنید</small>
-              </>
+          <div className="wide upload-wrap">
+            <label className="upload">
+              {f.image ? (
+                <img src={f.image} alt="اسکرین‌شات چارت معامله" />
+              ) : (
+                <>
+                  <ImagePlus />
+                  <b>اسکرین‌شات چارت</b>
+                  <small>برای انتخاب تصویر کلیک کنید</small>
+                </>
+              )}
+              <input type="file" accept="image/*" onChange={image} />
+            </label>
+            {f.image && (
+              <a
+                className="image-download"
+                href={f.image}
+                download={`ETT-${f.date}-${String(f.market || "trade").replace(/[^a-zA-Z0-9_-]/g, "-")}.png`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                <Download />
+                <span>دانلود عکس</span>
+              </a>
             )}
-            <input type="file" accept="image/*" onChange={image} />
-          </label>
+          </div>
           <div className="form-grid">
             <label>
               بازار
