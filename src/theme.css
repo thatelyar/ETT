@@ -1,0 +1,210 @@
+[data-theme="dark"] {
+  color-scheme: dark;
+  background: #0d1117;
+}
+[data-theme="dark"] body,
+[data-theme="dark"] main {
+  background: #0d1117;
+  color: #f5f7fa;
+}
+[data-theme="dark"] aside {
+  background: #121820;
+  border-color: #262d37;
+  box-shadow: none;
+}
+[data-theme="dark"] header {
+  background: #121820ed;
+  border-color: #262d37;
+  box-shadow: none;
+}
+[data-theme="dark"] .brand,
+[data-theme="dark"] .welcome h1,
+[data-theme="dark"] .page-title h1,
+[data-theme="dark"] .stat h2,
+[data-theme="dark"] .panel-head h3,
+[data-theme="dark"] .balance-edit,
+[data-theme="dark"] .day,
+[data-theme="dark"] .day-market,
+[data-theme="dark"] .trade-list button,
+[data-theme="dark"] .modal-head h2,
+[data-theme="dark"] td,
+[data-theme="dark"] .direction-cards b {
+  color: #f5f7fa;
+}
+[data-theme="dark"] nav button,
+[data-theme="dark"] .nav-bottom > button {
+  color: #9aa3ad;
+}
+[data-theme="dark"] nav button:hover,
+[data-theme="dark"] .nav-bottom > button:hover {
+  background: #19212b;
+  color: #fff;
+}
+[data-theme="dark"] nav button.active,
+[data-theme="dark"] .nav-bottom > button.active {
+  background: #122b47;
+  color: #55a8ff;
+}
+[data-theme="dark"] .search,
+[data-theme="dark"] .search kbd,
+[data-theme="dark"] .quick-toggle {
+  background: #1a212b;
+  border-color: #303844;
+  color: #b1bac4;
+}
+[data-theme="dark"] .search input {
+  color: #f5f7fa;
+}
+[data-theme="dark"] .quick-toggle:hover {
+  color: #55a8ff;
+  border-color: #2869a8;
+}
+[data-theme="dark"] .stat,
+[data-theme="dark"] .panel,
+[data-theme="dark"] .streak {
+  background: #151b23;
+  border-color: #29313b;
+  box-shadow: 0 5px 18px #0003;
+}
+[data-theme="dark"] .stat-icon,
+[data-theme="dark"] .preference-icon,
+[data-theme="dark"] .rank-list em {
+  background: #122b47;
+  color: #55a8ff;
+}
+[data-theme="dark"] .balance-edit input {
+  color: #f5f7fa;
+}
+[data-theme="dark"] .ring {
+  background: conic-gradient(#1685f8 var(--p), #2a323d 0);
+}
+[data-theme="dark"] .ring:after {
+  background: #151b23;
+}
+[data-theme="dark"] .wl b {
+  color: #f5f7fa;
+}
+[data-theme="dark"] .mini,
+[data-theme="dark"] .mini span:first-child {
+  border-color: #2a323d;
+}
+[data-theme="dark"] .month-nav button,
+[data-theme="dark"] .segmented {
+  background: #1c242e;
+  border-color: #303844;
+  color: #aeb7c1;
+}
+[data-theme="dark"] .segmented button.selected {
+  background: #283443;
+  color: #55a8ff;
+  box-shadow: none;
+}
+[data-theme="dark"] .segmented button {
+  color: #929ca7;
+}
+[data-theme="dark"] .day {
+  background: #121820;
+  border-color: #29313b;
+}
+[data-theme="dark"] .day.profit {
+  background: #10251e;
+  border-color: #24684e;
+}
+[data-theme="dark"] .day.loss {
+  background: #29171b;
+  border-color: #71343d;
+}
+[data-theme="dark"] .day:not(.blank):hover {
+  border-color: #1685f8;
+  box-shadow: 0 4px 14px #007aff20;
+}
+[data-theme="dark"] .day.has-image:after {
+  background: linear-gradient(90deg, #121820ef, transparent);
+}
+[data-theme="dark"] .day-image {
+  opacity: 0.25;
+}
+[data-theme="dark"] .trade-list button,
+[data-theme="dark"] td,
+[data-theme="dark"] th,
+[data-theme="dark"] .rank-list > div,
+[data-theme="dark"] .rules label {
+  border-color: #29313b;
+}
+[data-theme="dark"] tbody tr:hover,
+[data-theme="dark"] th {
+  background: #1a212b;
+}
+[data-theme="dark"] th {
+  color: #98a2ad;
+}
+[data-theme="dark"] .insight,
+[data-theme="dark"] .session-box {
+  background: linear-gradient(135deg, #122b47, #151b23);
+  border-color: #254a70;
+}
+[data-theme="dark"] .direction-cards > div {
+  background: #11171e;
+  border-color: #29313b;
+}
+[data-theme="dark"] .bar-list > div > div {
+  background: #2a323d;
+}
+[data-theme="dark"] .modal {
+  background: #151b23;
+  border-color: #303844;
+  box-shadow: 0 25px 70px #0008;
+}
+[data-theme="dark"] .modal-body {
+  background: #151b23;
+}
+[data-theme="dark"] .modal-head,
+[data-theme="dark"] .modal-foot {
+  border-color: #29313b;
+}
+[data-theme="dark"] .modal-head button,
+[data-theme="dark"] .cancel {
+  background: #202832;
+  border-color: #343d48;
+  color: #b3bcc6;
+}
+[data-theme="dark"] .upload {
+  background: #11171e;
+  border-color: #414b57;
+}
+[data-theme="dark"] .form-grid input,
+[data-theme="dark"] .form-grid select,
+[data-theme="dark"] .form-grid textarea,
+[data-theme="dark"] .plan-limits input,
+[data-theme="dark"] .settings-form input,
+[data-theme="dark"] .settings-form select,
+[data-theme="dark"] .checklist form input {
+  background: #11171e;
+  border-color: #343d48;
+  color: #f5f7fa;
+}
+[data-theme="dark"] .risk-note,
+[data-theme="dark"] .data-box > button {
+  background: #122b47;
+  color: #55a8ff;
+  border-color: #254a70;
+}
+[data-theme="dark"] .saved-hint {
+  background: #102b22;
+  color: #54d49b;
+}
+[data-theme="dark"] .danger-zone {
+  background: #2a171b;
+  border-color: #69313a;
+}
+[data-theme="dark"] .recharts-cartesian-grid line {
+  stroke: #29313b !important;
+}
+[data-theme="dark"] .recharts-cartesian-axis-tick text {
+  fill: #8994a0 !important;
+}
+[data-theme="dark"] .recharts-default-tooltip {
+  background: #1a212b !important;
+  border-color: #3b4551 !important;
+  color: #f5f7fa !important;
+}
