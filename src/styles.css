@@ -4,6 +4,61 @@
   background: #07100f;
   font-synthesis: none;
 }
+
+.auth-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(145deg, #eef7ff, #f7f9fc 55%, #e8f2ff);
+  color: #171d26;
+}
+.auth-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 16px;
+  padding: 34px;
+  border: 1px solid #dce3eb;
+  border-radius: 26px;
+  background: #fff;
+  box-shadow: 0 24px 70px #263c5b1a;
+}
+.auth-logo {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: #fff;
+  background: linear-gradient(145deg, #2497ff, #0067e8);
+}
+.auth-logo svg { width: 34px; height: 34px; }
+.auth-card h1 { margin: 0; font-size: 32px; }
+.auth-card p { margin: -10px 0 8px; color: #737d8c; }
+.auth-card label { display: grid; gap: 8px; font-weight: 700; }
+.auth-card input {
+  min-width: 0;
+  height: 50px;
+  padding: 0 14px;
+  border: 1px solid #d8e0e9;
+  border-radius: 13px;
+  background: #f9fbfd;
+  font: inherit;
+  direction: ltr;
+}
+.auth-card > button { min-height: 50px; border-radius: 13px; }
+.auth-switch { border: 0; background: transparent; color: #087cf0; font: inherit; cursor: pointer; }
+.auth-message { padding: 11px 13px; border-radius: 11px; background: #edf6ff; color: #1769aa; font-size: 13px; }
+.cloud-account { margin-top: 14px; padding: 16px; border-radius: 14px; background: #f4f8fc; }
+.cloud-account p { margin: 6px 0 12px; color: #737d8c; font-size: 13px; overflow-wrap: anywhere; }
+.cloud-account button { display: inline-flex; align-items: center; gap: 7px; border: 0; color: #e23e4d; background: transparent; font: inherit; cursor: pointer; }
+.cloud-account svg { width: 18px; }
+[data-theme="dark"] .cloud-account { background: #0f1721; }
+@media (prefers-color-scheme: dark) {
+  .auth-page { background: #0d1117; color: #f4f7fb; }
+  .auth-card { background: #151b23; border-color: #27313d; }
+  .auth-card input { color: #fff; background: #0f151d; border-color: #2d3845; }
+}
 * {
   box-sizing: border-box;
 }

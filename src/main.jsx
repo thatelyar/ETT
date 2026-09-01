@@ -26,6 +26,7 @@ import {
   ImagePlus,
   LayoutDashboard,
   Languages,
+  LogOut,
   Menu,
   Moon,
   Plus,
@@ -38,6 +39,13 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import {
+  cloudEnabled,
+  loadCloudData,
+  saveCloudSettings,
+  saveCloudTrades,
+  supabase,
+} from "./supabase";
 import "./styles.css";
 import "./theme.css";
 import "./responsive.css";
@@ -412,6 +420,9 @@ function App() {
   const [daySheet, setDaySheet] = useState(null);
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
+  const [session, setSession] = useState(null);
+  const [cloudReady, setCloudReady] = useState(!cloudEnabled);
+  const [cloudState, setCloudState] = useState(cloudEnabled ? "loading" : "local");
   const [profile, setProfile] = useState(() => {
     try {
       return (
@@ -466,6 +477,69 @@ function App() {
     () => localStorage.setItem("tradeflow_language", language),
     [language],
   );
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    supabase.auth.getSession().then(({ data }) => setSession(data.session));
+    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      if (!nextSession) setCloudReady(false);
+    });
+    return () => data.subscription.unsubscribe();
+  }, []);
+  useEffect(() => {
+    if (!cloudEnabled || !session?.user?.id) return;
+    let active = true;
+    setCloudState("loading");
+    loadCloudData(session.user.id)
+      .then(async ({ settings, trades: remoteTrades }) => {
+        if (!active) return;
+        const hasLocalTrades = localStorage.getItem("tradeflow_trades") !== null;
+        const hasRemoteData = Boolean(settings || remoteTrades.length);
+        if (hasRemoteData) {
+          setTrades(remoteTrades);
+          if (settings) {
+            setProfile(settings.profile);
+            setAccountBalance(Number(settings.balance || 0));
+            setPlan(settings.plan);
+          }
+        } else if (hasLocalTrades) {
+          await Promise.all([
+            saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan }),
+            saveCloudTrades(session.user.id, trades),
+          ]);
+        } else {
+          setTrades([]);
+          await saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan });
+        }
+        if (active) {
+          setCloudReady(true);
+          setCloudState("synced");
+        }
+      })
+      .catch((error) => {
+        console.error(error);
+        if (active) setCloudState("error");
+      });
+    return () => { active = false; };
+    // Initial cloud hydration must only run when the signed-in user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
+  useEffect(() => {
+    if (!cloudEnabled || !cloudReady || !session?.user?.id) return;
+    setCloudState("saving");
+    const timer = window.setTimeout(() => {
+      Promise.all([
+        saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan }),
+        saveCloudTrades(session.user.id, trades),
+      ])
+        .then(() => setCloudState("synced"))
+        .catch((error) => {
+          console.error(error);
+          setCloudState("error");
+        });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [trades, accountBalance, profile, plan, cloudReady, session?.user?.id]);
   useLayoutEffect(() => {
     if (language === "en") translateUI(appRef.current);
   }, [
@@ -548,6 +622,8 @@ function App() {
     ["analytics", "تحلیل عملکرد", BarChart3],
     ["playbook", "پلن معاملاتی", BookOpen],
   ];
+  if (cloudEnabled && !session) return <AuthScreen />;
+  if (cloudEnabled && !cloudReady) return <CloudLoading />;
   return (
     <div
       ref={appRef}
@@ -927,6 +1003,9 @@ function App() {
               setTheme={setTheme}
               language={language}
               setLanguage={setLanguage}
+              session={session}
+              cloudState={cloudState}
+              onLogout={() => supabase?.auth.signOut()}
             />
           )}
         </div>
@@ -975,6 +1054,50 @@ function PageTitle({ eyebrow, title, text }) {
       <span>{eyebrow}</span>
       <h1>{title}</h1>
       <p>{text}</p>
+    </div>
+  );
+}
+
+function CloudLoading() {
+  return (
+    <div className="auth-page" dir="rtl">
+      <div className="auth-card"><span className="auth-logo"><TrendingUp /></span><h1>ETT</h1><p>در حال همگام‌سازی اطلاعات حساب…</p></div>
+    </div>
+  );
+}
+
+function AuthScreen() {
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function submit(event) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage("");
+    const result = mode === "login"
+      ? await supabase.auth.signInWithPassword({ email, password })
+      : await supabase.auth.signUp({ email, password });
+    setBusy(false);
+    if (result.error) setMessage(result.error.message);
+    else if (mode === "signup" && !result.data.session)
+      setMessage("لینک تأیید برایت ایمیل شد. بعد از تأیید وارد شو.");
+  }
+  return (
+    <div className="auth-page" dir="rtl">
+      <form className="auth-card" onSubmit={submit}>
+        <span className="auth-logo"><TrendingUp /></span>
+        <h1>ETT</h1>
+        <p>{mode === "login" ? "ورود به ژورنال معاملاتی" : "ساخت حساب رایگان"}</p>
+        <label>ایمیل<input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" /></label>
+        <label>رمز عبور<input required minLength="6" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete={mode === "login" ? "current-password" : "new-password"} /></label>
+        {message && <div className="auth-message">{message}</div>}
+        <button className="primary" disabled={busy}>{busy ? "کمی صبر کن…" : mode === "login" ? "ورود" : "ثبت‌نام"}</button>
+        <button type="button" className="auth-switch" onClick={() => { setMode(mode === "login" ? "signup" : "login"); setMessage(""); }}>
+          {mode === "login" ? "حساب نداری؟ ثبت‌نام کن" : "حساب داری؟ وارد شو"}
+        </button>
+      </form>
     </div>
   );
 }
@@ -1354,6 +1477,9 @@ function SettingsPage({
   setTheme,
   language,
   setLanguage,
+  session,
+  cloudState,
+  onLogout,
 }) {
   const exportData = () => {
     const blob = new Blob(
@@ -1466,6 +1592,11 @@ function SettingsPage({
           <button onClick={exportData}>
             دریافت نسخه پشتیبان JSON <ChevronLeft />
           </button>
+          <div className="cloud-account">
+            <b>{session ? "فضای ابری متصل است" : "ذخیره‌سازی محلی"}</b>
+            <p>{session ? `${session.user.email} · ${cloudState === "synced" ? "همگام است" : cloudState === "saving" ? "در حال ذخیره…" : cloudState === "error" ? "خطا در همگام‌سازی" : "در حال اتصال…"}` : "پس از اتصال Supabase، اطلاعات بین دستگاه‌ها همگام می‌شود."}</p>
+            {session && <button type="button" onClick={onLogout}><LogOut /> خروج از حساب</button>}
+          </div>
           <div className="danger-zone">
             <b>پاک‌کردن معاملات</b>
             <p>
