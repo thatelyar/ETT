@@ -1,9 +1,10 @@
-const CACHE = "ett-v2-safe-area";
+const CACHE = "ett-v3-full-icon";
 const CORE = [
   "./",
   "./manifest.webmanifest",
   "./icon-192.png",
   "./icon-512.png",
+  "./apple-touch-icon-v2.png",
 ];
 self.addEventListener("install", (event) =>
   event.waitUntil(
