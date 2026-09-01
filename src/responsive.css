@@ -1,3 +1,16 @@
+/* iOS Home Screen / standalone safe areas */
+@media (display-mode: standalone) {
+  body { min-height: 100dvh; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  header { top: 0; padding-top: env(safe-area-inset-top, 0px); height: calc(72px + env(safe-area-inset-top, 0px)); min-height: calc(72px + env(safe-area-inset-top, 0px)); }
+  aside { padding-top: calc(26px + env(safe-area-inset-top, 0px)); padding-bottom: calc(26px + env(safe-area-inset-bottom, 0px)); }
+  .modal-wrap { padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .modal-foot { padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (display-mode: standalone) and (max-width: 760px) {
+  header { padding-top: calc(10px + env(safe-area-inset-top, 0px)); min-height: calc(70px + env(safe-area-inset-top, 0px)); height: auto; align-content: flex-start; }
+  .content { padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)); }
+}
+
 @media (max-width: 1100px) {
   aside {
     transform: translateX(110%);
