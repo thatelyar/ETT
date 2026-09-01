@@ -52,11 +52,10 @@ import "./theme.css";
 import "./responsive.css";
 
 const faDigits = (n) => String(n).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
-const money = (n) =>
-  `${Number(n) >= 0 ? "+" : ""}$${Math.abs(Number(n)).toLocaleString("en-US")}`.replace(
-    "$-",
-    "-$",
-  );
+const money = (n) => {
+  const value = Number(n) || 0;
+  return `${value >= 0 ? "+" : "-"}$${Math.abs(value).toLocaleString("en-US")}`;
+};
 const monthNames = [
   "ژانویه",
   "فوریه",
@@ -87,6 +86,9 @@ const enMap = {
   "دانلود عکس": "Download image",
   "جستجو در معاملات...": "Search trades...",
   "موجودی حساب": "Account balance",
+  "موجودی فعلی": "Current balance",
+  "سرمایه اولیه": "Initial balance",
+  "سود و زیان کل": "Total P&L",
   "سود خالص ماه": "Monthly net P&L",
   "نرخ برد": "Win rate",
   "نسبت سود به ضرر": "Profit factor",
@@ -580,8 +582,14 @@ function App() {
     : grossProfit
       ? grossProfit
       : 0;
+  const allTimePnl = trades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+  const currentBalance = accountBalance + allTimePnl;
   const equity = useMemo(() => {
-    let v = accountBalance - total;
+    const monthStart = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-01`;
+    const previousPnl = trades
+      .filter((trade) => trade.date < monthStart)
+      .reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+    let v = accountBalance + previousPnl;
     return [
       { name: "شروع", value: v },
       ...[...monthTrades]
@@ -591,7 +599,7 @@ function App() {
           value: (v += Number(t.pnl)),
         })),
     ];
-  }, [monthTrades, accountBalance, total]);
+  }, [monthTrades, accountBalance, trades, month]);
   function save(data) {
     setTrades((x) =>
       data.id
@@ -762,11 +770,12 @@ function App() {
             <section className="stats">
               <Stat
                 icon={CircleDollarSign}
-                label="موجودی حساب"
-                value={accountBalance}
-                editable
-                onChange={setAccountBalance}
-                detail="برای تغییر روی عدد کلیک کنید"
+                label="موجودی فعلی"
+                value={`$${currentBalance.toLocaleString("en-US")}`}
+                secondaryLabel="سرمایه اولیه"
+                secondaryValue={`$${accountBalance.toLocaleString("en-US")}`}
+                delta={money(allTimePnl)}
+                detail="سود و زیان کل"
               />
               <Stat
                 icon={TrendingUp}
@@ -803,7 +812,7 @@ function App() {
                   sub="بر اساس معاملات ثبت‌شده این ماه"
                 />
                 <div className="chart-total">
-                  <b>${accountBalance.toLocaleString("en-US")}</b>
+                  <b>${currentBalance.toLocaleString("en-US")}</b>
                   <span className={total >= 0 ? "green" : "red"}>
                     {money(total)}
                   </span>
@@ -1581,7 +1590,7 @@ function SettingsPage({
             </select>
           </label>
           <label>
-            موجودی حساب
+            سرمایه اولیه
             <input
               type="number"
               value={balance}
@@ -1625,7 +1634,7 @@ function SettingsPage({
   );
 }
 
-function Stat({ icon: I, label, value, delta, detail, editable, onChange }) {
+function Stat({ icon: I, label, value, delta, detail, editable, onChange, secondaryLabel, secondaryValue }) {
   return (
     <div className="stat">
       <div className="stat-top">
@@ -1635,7 +1644,12 @@ function Stat({ icon: I, label, value, delta, detail, editable, onChange }) {
         <Spark down={false} />
       </div>
       <small>{label}</small>
-      {editable ? (
+      {secondaryLabel ? (
+        <div className="balance-summary">
+          <h2>{value}</h2>
+          <span><small>{secondaryLabel}</small><b dir="ltr">{secondaryValue}</b></span>
+        </div>
+      ) : editable ? (
         <div className="balance-edit">
           <span>$</span>
           <input
