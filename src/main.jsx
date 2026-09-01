@@ -512,6 +512,7 @@ function App() {
           await saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan });
         }
         if (active) {
+          localStorage.setItem("tradeflow_cloud_owner", session.user.id);
           setCloudReady(true);
           setCloudState("synced");
         }
@@ -615,6 +616,11 @@ function App() {
   function openDay(date, dayTrades = []) {
     if (dayTrades.length) setDaySheet({ date });
     else newTrade(date);
+  }
+  async function logout() {
+    await supabase?.auth.signOut();
+    ["tradeflow_trades", "tradeflow_balance", "tradeflow_profile", "tradeflow_plan", "tradeflow_cloud_owner"].forEach((key) => localStorage.removeItem(key));
+    window.location.reload();
   }
   const nav = [
     ["dashboard", "نمای کلی", LayoutDashboard],
@@ -1005,7 +1011,7 @@ function App() {
               setLanguage={setLanguage}
               session={session}
               cloudState={cloudState}
-              onLogout={() => supabase?.auth.signOut()}
+              onLogout={logout}
             />
           )}
         </div>
