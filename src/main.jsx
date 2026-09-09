@@ -72,6 +72,42 @@ const monthNames = [
 ];
 const week = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+function loadImage(url) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = reject;
+    image.src = url;
+  });
+}
+
+async function prepareTradeImage(file) {
+  const objectUrl = URL.createObjectURL(file);
+  try {
+    const image = await loadImage(objectUrl);
+    const maxSide = 1600;
+    const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+    canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.78));
+    if (!blob) throw new Error("Image conversion failed");
+    return await fileToDataUrl(blob);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 const enMap = {
   "نمای کلی": "Overview",
   "ژورنال معاملاتی": "Trading Journal",
@@ -457,10 +493,23 @@ function App() {
       return { maxRisk: 1, dailyLoss: 3, hours: "۱۱:۰۰ تا ۱۷:۰۰", rules: [] };
     }
   });
-  useEffect(
-    () => localStorage.setItem("tradeflow_trades", JSON.stringify(trades)),
-    [trades],
-  );
+  useEffect(() => {
+    try {
+      localStorage.setItem("tradeflow_trades", JSON.stringify(trades));
+    } catch (error) {
+      // Large screenshots can exceed Safari's small localStorage quota. Cloud
+      // sync still keeps the image; the lightweight local copy prevents a crash.
+      console.warn("Local trade cache exceeded its quota", error);
+      try {
+        localStorage.setItem(
+          "tradeflow_trades",
+          JSON.stringify(trades.map((trade) => ({ ...trade, image: "" }))),
+        );
+      } catch (fallbackError) {
+        console.warn("Unable to update the local trade cache", fallbackError);
+      }
+    }
+  }, [trades]);
   useEffect(
     () => localStorage.setItem("tradeflow_balance", String(accountBalance)),
     [accountBalance],
@@ -1840,13 +1889,23 @@ function Calendar({ month, trades, onDay }) {
 }
 function TradeModal({ trade, onSave, onDelete, onClose }) {
   const [f, setF] = useState(trade);
+  const [imageBusy, setImageBusy] = useState(false);
+  const [imageError, setImageError] = useState("");
   const put = (k, v) => setF((x) => ({ ...x, [k]: v }));
-  function image(e) {
+  async function image(e) {
     const file = e.target.files[0];
     if (!file) return;
-    const r = new FileReader();
-    r.onload = () => put("image", r.result);
-    r.readAsDataURL(file);
+    setImageBusy(true);
+    setImageError("");
+    try {
+      put("image", await prepareTradeImage(file));
+    } catch (error) {
+      console.error(error);
+      setImageError("این تصویر قابل پردازش نیست؛ لطفاً یک تصویر JPG یا PNG انتخاب کنید.");
+    } finally {
+      setImageBusy(false);
+      e.target.value = "";
+    }
   }
   return (
     <div
@@ -1878,11 +1937,11 @@ function TradeModal({ trade, onSave, onDelete, onClose }) {
               ) : (
                 <>
                   <ImagePlus />
-                  <b>اسکرین‌شات چارت</b>
-                  <small>برای انتخاب تصویر کلیک کنید</small>
+                  <b>{imageBusy ? "در حال آماده‌سازی تصویر…" : "اسکرین‌شات چارت"}</b>
+                  <small>{imageBusy ? "چند لحظه صبر کنید" : "برای انتخاب تصویر کلیک کنید"}</small>
                 </>
               )}
-              <input type="file" accept="image/*" onChange={image} />
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={image} disabled={imageBusy} />
             </label>
             {f.image && (
               <a
@@ -1896,6 +1955,7 @@ function TradeModal({ trade, onSave, onDelete, onClose }) {
               </a>
             )}
           </div>
+          {imageError && <p className="image-error">{imageError}</p>}
           <div className="form-grid">
             <label>
               بازار
@@ -1998,7 +2058,7 @@ function TradeModal({ trade, onSave, onDelete, onClose }) {
           <button type="button" className="cancel" onClick={onClose}>
             انصراف
           </button>
-          <button className="primary">ذخیره معامله</button>
+          <button className="primary" disabled={imageBusy}>ذخیره معامله</button>
         </div>
       </form>
     </div>

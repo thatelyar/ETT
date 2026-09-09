@@ -937,6 +937,11 @@ header {
   width: 17px;
   height: 17px;
 }
+.image-error {
+  margin: 8px 2px 0;
+  color: #e23e4d;
+  font-size: 11px;
+}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
