@@ -16,14 +16,22 @@ import {
   YAxis,
 } from "recharts";
 import {
+  Activity,
+  Award,
   BarChart3,
   BookOpen,
+  BrainCircuit,
+  Calculator,
   CalendarDays,
+  CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CircleDollarSign,
   Clock3,
+  Command,
   Download,
+  Flame,
+  Gauge,
   ImagePlus,
   LayoutDashboard,
   Languages,
@@ -33,6 +41,8 @@ import {
   Plus,
   Search,
   Settings,
+  ShieldCheck,
+  Sparkles,
   Target,
   Sun,
   Trash2,
@@ -50,6 +60,7 @@ import {
 import "./styles.css";
 import "./theme.css";
 import "./responsive.css";
+import "./premium.css";
 
 const faDigits = (n) => String(n).replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[d]);
 const money = (n) => {
@@ -71,6 +82,35 @@ const monthNames = [
   "دسامبر",
 ];
 const week = ["ش", "ی", "د", "س", "چ", "پ", "ج"];
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+function getJournalStreak(trades) {
+  const dates = [...new Set(trades.map((trade) => trade.date))]
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a));
+  if (!dates.length) return 0;
+  let streak = 1;
+  for (let index = 1; index < dates.length; index += 1) {
+    const newer = new Date(`${dates[index - 1]}T12:00:00`);
+    const older = new Date(`${dates[index]}T12:00:00`);
+    const gap = Math.round((newer - older) / 86400000);
+    if (gap <= 3) streak += 1;
+    else break;
+  }
+  return streak;
+}
+
+function getMaxDrawdown(points) {
+  let peak = Number(points[0]?.value || 0);
+  let maxDrawdown = 0;
+  points.forEach((point) => {
+    const value = Number(point.value || 0);
+    peak = Math.max(peak, value);
+    maxDrawdown = Math.max(maxDrawdown, peak - value);
+  });
+  return maxDrawdown;
+}
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -286,12 +326,49 @@ Object.assign(enMap, {
   اکتبر: "October",
   نوامبر: "November",
   دسامبر: "December",
+  "میز کار حرفه‌ای معامله‌گر": "Professional trading workspace",
+  "برآیند ماهت مثبت است؛ کیفیت اجرا را حفظ کن.": "Your month is positive; protect execution quality.",
+  "روی کنترل ریسک و اجرای بدون هیجان تمرکز کن.": "Focus on risk control and calm execution.",
+  "محاسبه ریسک": "Risk calculator",
+  "ماشین حساب ریسک": "Risk calculator",
+  "همگام و امن": "Synced & secure",
+  "در حال ذخیره": "Saving",
+  "ذخیره محلی": "Saved locally",
+  "امتیاز عملکرد": "Performance score",
+  "لبهٔ قوی": "Strong edge",
+  "رو به رشد": "Improving",
+  "در حال ساخت": "Building your edge",
+  "ترکیبی از نرخ برد، سوددهی و نظم ژورنال‌نویسی": "A blend of win rate, profitability, and journal consistency",
+  "امید ریاضی هر معامله": "Trade expectancy",
+  "بازده به ریسک واقعی": "Realized risk return",
+  "بیشترین افت ماه": "Monthly max drawdown",
+  "محاسبه حجم معامله": "Calculate position size",
+  "کوچ هوشمند": "Smart coach",
+  "امید ریاضی": "Expectancy",
+  "میانگین خروجی هر معامله": "Average outcome per trade",
+  "توان جبران افت سرمایه": "Drawdown recovery strength",
+  "بازده کل": "Total return",
+  "نسبت به سرمایه اولیه": "Relative to starting balance",
+  "ماشین حساب حجم و ریسک": "Position size & risk calculator",
+  "قبل از ورود، اندازه پوزیشن و نسبت سود به ضرر را دقیق ببین.": "Size the position and preview reward-to-risk before entry.",
+  "حجم پیشنهادی": "Suggested position size",
+  "واحد دارایی بر اساس فاصله حد ضرر": "Asset units based on stop distance",
+  "سرمایه در معرض ریسک": "Capital at risk",
+  "سود بالقوه": "Potential reward",
+  "بدون تغییر در اطلاعاتت": "Your data stays unchanged",
+  "این ابزار فقط محاسبه می‌کند و چیزی در ژورنال یا دیتابیس ذخیره نمی‌کند.": "This tool only calculates and saves nothing to your journal or database.",
+  "متوجه شدم": "Done",
+  "برای اجرای پلن آماده‌ای": "You're ready to execute the plan",
+  "چک‌لیست کامل است؛ ریسک تعریف‌شده را حفظ کن.": "Checklist complete. Keep risk within the plan.",
 });
 const toLatinDigits = (value) =>
   value.replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)]);
 function dynamicEnglish(value) {
   let out = enMap[value] || value;
   out = out
+    .replace(/سلام (.+)، امروز با پلن جلو می‌ریم\./g, "Hi $1, let's trade the plan today.")
+    .replace(/(.+) لبهٔ معاملاتی این ماه توست/g, "$1 is your edge this month")
+    .replace(/(\S+) معامله با نرخ برد (\S+)٪ و نتیجهٔ (.+) ثبت شده است\./g, "$1 trades at a $2% win rate, returning $3.")
     .replace(/(\S+) معامله در این ماه/g, "$1 trades this month")
     .replace(/از (\S+) معامله/g, "from $1 trades")
     .replace(/(\S+) معامله ذخیره‌شده/g, "$1 saved trades")
@@ -438,8 +515,9 @@ function Spark({ down = false }) {
 
 function App() {
   const appRef = useRef(null);
+  const searchRef = useRef(null);
   const [theme, setTheme] = useState(
-    () => localStorage.getItem("tradeflow_theme") || "light",
+    () => localStorage.getItem("tradeflow_theme") || "dark",
   );
   const [language, setLanguage] = useState(
     () => localStorage.getItem("tradeflow_language") || "fa",
@@ -458,6 +536,7 @@ function App() {
   const [month, setMonth] = useState(new Date(2026, 8, 1));
   const [modal, setModal] = useState(null);
   const [daySheet, setDaySheet] = useState(null);
+  const [riskCalculatorOpen, setRiskCalculatorOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [query, setQuery] = useState("");
   const [session, setSession] = useState(null);
@@ -530,6 +609,17 @@ function App() {
     () => localStorage.setItem("tradeflow_language", language),
     [language],
   );
+  useEffect(() => {
+    const handleShortcut = (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+      if (event.key === "Escape") setRiskCalculatorOpen(false);
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, []);
   useEffect(() => {
     if (!cloudEnabled) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -649,6 +739,48 @@ function App() {
         })),
     ];
   }, [monthTrades, accountBalance, trades, month]);
+  const journalStreak = useMemo(() => getJournalStreak(trades), [trades]);
+  const maxDrawdown = useMemo(() => getMaxDrawdown(equity), [equity]);
+  const expectancy = monthTrades.length ? total / monthTrades.length : 0;
+  const averageRisk = monthTrades.length
+    ? monthTrades.reduce((sum, trade) => sum + Math.abs(Number(trade.risk || 0)), 0) /
+      monthTrades.length
+    : 0;
+  const realizedRR = averageRisk ? expectancy / averageRisk : 0;
+  const edgeScore = clamp(
+    Math.round(
+      winrate * 0.45 +
+        Math.min(profitFactor, 3) * 14 +
+        Math.min(journalStreak, 10) * 1.3,
+    ),
+    0,
+    99,
+  );
+  const smartInsight = useMemo(() => {
+    if (!monthTrades.length) {
+      return {
+        eyebrow: "کوچ هوشمند",
+        title: "اولین معامله این ماه را ثبت کن",
+        text: "بعد از ثبت معامله، الگوهای عملکرد و نقاط قوتت اینجا نمایش داده می‌شوند.",
+      };
+    }
+    const groups = monthTrades.reduce((result, trade) => {
+      const key = trade.setup || trade.market || "بدون ستاپ";
+      result[key] ||= { pnl: 0, wins: 0, count: 0 };
+      result[key].pnl += Number(trade.pnl || 0);
+      result[key].wins += Number(trade.pnl || 0) > 0 ? 1 : 0;
+      result[key].count += 1;
+      return result;
+    }, {});
+    const [name, metric] = Object.entries(groups).sort(
+      (a, b) => b[1].pnl - a[1].pnl,
+    )[0];
+    return {
+      eyebrow: "کوچ هوشمند",
+      title: `${name} لبهٔ معاملاتی این ماه توست`,
+      text: `${faDigits(metric.count)} معامله با نرخ برد ${faDigits(Math.round((metric.wins / metric.count) * 100))}٪ و نتیجهٔ ${money(metric.pnl)} ثبت شده است.`,
+    };
+  }, [monthTrades]);
   function save(data) {
     setTrades((x) =>
       data.id
@@ -700,11 +832,11 @@ function App() {
     >
       <aside className={mobileNav ? "open" : ""}>
         <div className="brand">
-          <span>
+          <span className="brand-mark">
             <TrendingUp />
           </span>
           <div>
-            TradeFlow<small>ژورنال حرفه‌ای معامله‌گری</small>
+            <b>ETT</b><small>Elite Trading Terminal</small>
           </div>
           <button className="closeNav" onClick={() => setMobileNav(false)}>
             <X />
@@ -746,7 +878,13 @@ function App() {
             role="button"
             tabIndex="0"
           >
-            <div className="avatar">EA</div>
+            <div className="avatar">
+              {(profile.name || "ET")
+                .split(" ")
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join("")}
+            </div>
             <div>
               <b>{profile.name}</b>
               <small>حساب حرفه‌ای</small>
@@ -763,6 +901,7 @@ function App() {
           <div className="search">
             <Search />
             <input
+              ref={searchRef}
               placeholder="جستجو در معاملات..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -770,6 +909,15 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="header-actions">
+            <button
+              className="quick-toggle risk-tool"
+              aria-label="ماشین حساب ریسک"
+              title="ماشین حساب ریسک"
+              onClick={() => setRiskCalculatorOpen(true)}
+            >
+              <Calculator />
+              <span>محاسبه ریسک</span>
+            </button>
             <button
               className="quick-toggle"
               aria-label="Language"
@@ -785,8 +933,8 @@ function App() {
             >
               {theme === "light" ? <Moon /> : <Sun />}
             </button>
-            <span className="live">
-              <i /> بازار باز است
+            <span className={`live ${cloudState === "error" ? "offline" : ""}`}>
+              <i /> {cloudState === "saving" ? "در حال ذخیره" : cloudState === "error" ? "ذخیره محلی" : "همگام و امن"}
             </span>
             <button
               className="primary add-trade-button"
@@ -804,15 +952,33 @@ function App() {
           >
             <section className="welcome">
               <div>
-                <p>سه‌شنبه، ۱۰ شهریور ۱۴۰۵</p>
-                <h1>سلام الیار، آماده‌ای بازار رو شکست بدی؟ 👋</h1>
-                <span>عملکردت این ماه عالیه. همین روند رو ادامه بده.</span>
+                <p className="workspace-status"><Sparkles /> میز کار حرفه‌ای معامله‌گر</p>
+                <h1>
+                  {language === "fa"
+                    ? `سلام ${profile.name?.split(" ")[0] || "معامله‌گر"}، امروز با پلن جلو می‌ریم.`
+                    : `Hi ${profile.name?.split(" ")[0] || "Trader"}, let's trade the plan today.`}
+                </h1>
+                <span>
+                  {new Intl.DateTimeFormat(language === "fa" ? "fa-IR" : "en-US", {
+                    weekday: "long",
+                    day: "numeric",
+                    month: "long",
+                  }).format(new Date())}
+                  {" · "}
+                  {total >= 0 ? "برآیند ماهت مثبت است؛ کیفیت اجرا را حفظ کن." : "روی کنترل ریسک و اجرای بدون هیجان تمرکز کن."}
+                </span>
               </div>
-              <div className="streak">
-                <span>🔥</span>
+              <div className="hero-actions">
+                <div className="edge-pill">
+                  <Gauge />
+                  <span><small>Edge score</small><b>{faDigits(edgeScore)} / ۱۰۰</b></span>
+                </div>
+                <div className="streak">
+                <span><Flame /></span>
                 <div>
-                  <b>۶ روز</b>
+                  <b>{language === "fa" ? `${faDigits(journalStreak)} روز` : `${journalStreak} days`}</b>
                   <small>تداوم ژورنال‌نویسی</small>
+                </div>
                 </div>
               </div>
             </section>
@@ -872,10 +1038,10 @@ function App() {
                       <linearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
                         <stop
                           offset="0"
-                          stopColor="#007AFF"
+                          stopColor="#7C5CFC"
                           stopOpacity=".22"
                         />
-                        <stop offset="1" stopColor="#007AFF" stopOpacity="0" />
+                        <stop offset="1" stopColor="#27D7B0" stopOpacity="0" />
                       </linearGradient>
                     </defs>
                     <CartesianGrid stroke="#EBEDEF" vertical={false} />
@@ -888,16 +1054,17 @@ function App() {
                     <YAxis hide domain={["dataMin-100", "dataMax+100"]} />
                     <Tooltip
                       contentStyle={{
-                        background: "#FFFFFF",
-                        color: "#171D26",
-                        border: "1px solid #D7DADF",
-                        borderRadius: 12,
+                        background: "var(--surface-popover)",
+                        color: "var(--text-strong)",
+                        border: "1px solid var(--border-strong)",
+                        borderRadius: 14,
+                        boxShadow: "var(--shadow-lg)",
                       }}
                     />
                     <Area
                       type="monotone"
                       dataKey="value"
-                      stroke="#007AFF"
+                      stroke="#7C5CFC"
                       strokeWidth={3}
                       fill="url(#fill)"
                     />
@@ -905,7 +1072,14 @@ function App() {
                 </ResponsiveContainer>
               </div>
               <div className="panel summary">
-                <PanelHead title="خلاصه ماه" sub="شهریور ۱۴۰۵" />
+                <PanelHead
+                  title="خلاصه ماه"
+                  sub={
+                    language === "fa"
+                      ? `${monthNames[month.getMonth()]} ${faDigits(month.getFullYear())}`
+                      : `${dynamicEnglish(monthNames[month.getMonth()])} ${month.getFullYear()}`
+                  }
+                />
                 <Ring value={winrate} />
                 <div className="wl">
                   <div>
@@ -943,6 +1117,13 @@ function App() {
                 </div>
               </div>
             </section>
+            <EdgeSnapshot
+              score={edgeScore}
+              expectancy={expectancy}
+              realizedRR={realizedRR}
+              maxDrawdown={maxDrawdown}
+              onRisk={() => setRiskCalculatorOpen(true)}
+            />
             <section className="panel calendar">
               <div className="cal-head">
                 <PanelHead
@@ -1023,13 +1204,11 @@ function App() {
                 </div>
               </div>
               <div className="panel insight">
-                <div className="bulb">💡</div>
-                <span>بینش هوشمند</span>
-                <h3>بهترین عملکردت در سشن لندن بوده</h3>
-                <p>
-                  نرخ برد شما بین ساعت ۱۱ تا ۱۴، حدود ۲۳٪ بیشتر از میانگین است.
-                </p>
-                <button>
+                <div className="bulb"><BrainCircuit /></div>
+                <span>{smartInsight.eyebrow}</span>
+                <h3>{language === "fa" ? smartInsight.title : dynamicEnglish(smartInsight.title)}</h3>
+                <p>{language === "fa" ? smartInsight.text : dynamicEnglish(smartInsight.text)}</p>
+                <button onClick={() => setView("analytics")}>
                   مشاهده تحلیل کامل <ChevronLeft />
                 </button>
               </div>
@@ -1052,6 +1231,7 @@ function App() {
               winrate={winrate}
               total={total}
               profitFactor={profitFactor}
+              accountBalance={accountBalance}
             />
           )}
           {view === "playbook" && (
@@ -1091,6 +1271,13 @@ function App() {
           onClose={() => setModal(null)}
         />
       )}{" "}
+      {riskCalculatorOpen && (
+        <RiskCalculatorModal
+          balance={currentBalance}
+          defaultRisk={plan.maxRisk}
+          onClose={() => setRiskCalculatorOpen(false)}
+        />
+      )}
       {daySheet && (
         <DayTradesModal
           date={daySheet.date}
@@ -1111,6 +1298,44 @@ function App() {
         <div className="scrim" onClick={() => setMobileNav(false)} />
       )}
     </div>
+  );
+}
+
+function EdgeSnapshot({ score, expectancy, realizedRR, maxDrawdown, onRisk }) {
+  const status = score >= 75 ? "لبهٔ قوی" : score >= 55 ? "رو به رشد" : "در حال ساخت";
+  return (
+    <section className="edge-snapshot">
+      <div className="edge-score-card">
+        <div className="score-orbit" style={{ "--score": `${score * 3.6}deg` }}>
+          <span>{faDigits(score)}</span>
+        </div>
+        <div>
+          <span><Activity /> امتیاز عملکرد</span>
+          <h3>{status}</h3>
+          <p>ترکیبی از نرخ برد، سوددهی و نظم ژورنال‌نویسی</p>
+        </div>
+      </div>
+      <div className="edge-metric">
+        <span><Award /> امید ریاضی هر معامله</span>
+        <b className={expectancy >= 0 ? "green" : "red"}>{money(expectancy)}</b>
+        <small>Expected value</small>
+      </div>
+      <div className="edge-metric">
+        <span><ShieldCheck /> بازده به ریسک واقعی</span>
+        <b>{realizedRR.toFixed(2)}R</b>
+        <small>Realized R multiple</small>
+      </div>
+      <div className="edge-metric">
+        <span><TrendingDown /> بیشترین افت ماه</span>
+        <b className={maxDrawdown ? "red" : "green"}>{money(-maxDrawdown)}</b>
+        <small>Maximum drawdown</small>
+      </div>
+      <button className="edge-action" onClick={onRisk}>
+        <Calculator />
+        <span><b>محاسبه حجم معامله</b><small>Risk calculator</small></span>
+        <ChevronLeft />
+      </button>
+    </section>
   );
 }
 
@@ -1293,7 +1518,7 @@ function MonthNav({ month, setMonth }) {
   );
 }
 
-function AnalyticsPage({ trades, equity, winrate, total, profitFactor }) {
+function AnalyticsPage({ trades, equity, winrate, total, profitFactor, accountBalance }) {
   const byMarket = Object.values(
     trades.reduce((a, t) => {
       a[t.market] ||= { name: t.market, pnl: 0, count: 0 };
@@ -1315,6 +1540,15 @@ function AnalyticsPage({ trades, equity, winrate, total, profitFactor }) {
   const long = trades.filter((t) => t.side === "Long"),
     short = trades.filter((t) => t.side === "Short");
   const sum = (x) => x.reduce((s, t) => s + Number(t.pnl), 0);
+  const averageWin = trades.filter((trade) => Number(trade.pnl) > 0);
+  const averageLoss = trades.filter((trade) => Number(trade.pnl) < 0);
+  const avgWin = averageWin.length ? sum(averageWin) / averageWin.length : 0;
+  const avgLoss = averageLoss.length ? Math.abs(sum(averageLoss) / averageLoss.length) : 0;
+  const payoffRatio = avgLoss ? avgWin / avgLoss : 0;
+  const expectancy = trades.length ? sum(trades) / trades.length : 0;
+  const maxDrawdown = getMaxDrawdown(equity);
+  const recoveryFactor = maxDrawdown ? Math.max(0, total) / maxDrawdown : 0;
+  const returnPercent = accountBalance ? (sum(trades) / accountBalance) * 100 : 0;
   return (
     <div className="view-page">
       <PageTitle
@@ -1347,6 +1581,12 @@ function AnalyticsPage({ trades, equity, winrate, total, profitFactor }) {
           value={faDigits(trades.length)}
           detail="تمام دوره"
         />
+      </section>
+      <section className="pro-metrics">
+        <div><span><BrainCircuit /> امید ریاضی</span><b className={expectancy >= 0 ? "green" : "red"}>{money(expectancy)}</b><small>میانگین خروجی هر معامله</small></div>
+        <div><span><Award /> Payoff ratio</span><b>{payoffRatio.toFixed(2)}</b><small>میانگین برد ÷ میانگین باخت</small></div>
+        <div><span><ShieldCheck /> Recovery factor</span><b>{recoveryFactor.toFixed(2)}</b><small>توان جبران افت سرمایه</small></div>
+        <div><span><Activity /> بازده کل</span><b className={returnPercent >= 0 ? "green" : "red"}>{returnPercent.toFixed(2)}%</b><small>نسبت به سرمایه اولیه</small></div>
       </section>
       <section className="grid-top">
         <div className="panel">
@@ -1440,7 +1680,22 @@ function AnalyticsPage({ trades, equity, winrate, total, profitFactor }) {
 
 function PlaybookPage({ plan, setPlan }) {
   const [rule, setRule] = useState("");
+  const readinessKey = `tradeflow_readiness_${new Date().toISOString().slice(0, 10)}`;
+  const [checkedRules, setCheckedRules] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(readinessKey)) || [];
+    } catch {
+      return [];
+    }
+  });
   const put = (k, v) => setPlan((p) => ({ ...p, [k]: v }));
+  const completedRules = checkedRules.filter((item) => plan.rules.includes(item));
+  const readiness = plan.rules.length
+    ? Math.round((completedRules.length / plan.rules.length) * 100)
+    : 0;
+  useEffect(() => {
+    localStorage.setItem(readinessKey, JSON.stringify(checkedRules));
+  }, [checkedRules, readinessKey]);
   return (
     <div className="view-page">
       <PageTitle
@@ -1483,8 +1738,18 @@ function PlaybookPage({ plan, setPlan }) {
           <PanelHead title="چک‌لیست قبل از ورود" sub="قوانین قابل ویرایش شما" />
           <div className="rules">
             {plan.rules.map((r, i) => (
-              <label key={i}>
-                <input type="checkbox" />
+              <label key={`${r}-${i}`} className={checkedRules.includes(r) ? "checked" : ""}>
+                <input
+                  type="checkbox"
+                  checked={checkedRules.includes(r)}
+                  onChange={() =>
+                    setCheckedRules((current) =>
+                      current.includes(r)
+                        ? current.filter((item) => item !== r)
+                        : [...current, r],
+                    )
+                  }
+                />
                 <span>{r}</span>
                 <button
                   onClick={() =>
@@ -1521,12 +1786,17 @@ function PlaybookPage({ plan, setPlan }) {
         </div>
       </section>
       <section className="panel session-box">
-        <span>وضعیت آمادگی امروز</span>
-        <h3>قبل از اولین معامله، تمام قوانین را علامت بزن</h3>
-        <p>
-          داشتن پلن مشخص تصمیم‌های هیجانی را کمتر می‌کند و باعث ثبات عملکرد
-          می‌شود.
-        </p>
+        <div className="readiness-icon"><ShieldCheck /></div>
+        <div className="readiness-copy">
+          <span>وضعیت آمادگی امروز</span>
+          <h3>{readiness === 100 ? "برای اجرای پلن آماده‌ای" : "قبل از اولین معامله، تمام قوانین را علامت بزن"}</h3>
+          <p>{readiness === 100 ? "چک‌لیست کامل است؛ ریسک تعریف‌شده را حفظ کن." : "داشتن پلن مشخص تصمیم‌های هیجانی را کمتر می‌کند و باعث ثبات عملکرد می‌شود."}</p>
+        </div>
+        <div className="readiness-progress">
+          <strong>{faDigits(readiness)}٪</strong>
+          <span><i style={{ width: `${readiness}%` }} /></span>
+          <small>{faDigits(completedRules.length)} از {faDigits(plan.rules.length)} قانون</small>
+        </div>
       </section>
     </div>
   );
@@ -1887,6 +2157,59 @@ function Calendar({ month, trades, onDay }) {
     </>
   );
 }
+
+function RiskCalculatorModal({ balance, defaultRisk, onClose }) {
+  const [values, setValues] = useState({
+    balance: Number(balance || 0),
+    riskPercent: Number(defaultRisk || 1),
+    entry: "",
+    stop: "",
+    target: "",
+  });
+  const put = (key, value) => setValues((current) => ({ ...current, [key]: value }));
+  const riskCapital = (Number(values.balance) * Number(values.riskPercent)) / 100;
+  const stopDistance = Math.abs(Number(values.entry) - Number(values.stop));
+  const targetDistance = Math.abs(Number(values.target) - Number(values.entry));
+  const positionSize = stopDistance ? riskCapital / stopDistance : 0;
+  const rewardRisk = stopDistance && targetDistance ? targetDistance / stopDistance : 0;
+  const potentialReward = riskCapital * rewardRisk;
+  return (
+    <div className="modal-wrap" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="modal risk-calculator-modal">
+        <div className="modal-head">
+          <div>
+            <span>Risk Intelligence</span>
+            <h2>ماشین حساب حجم و ریسک</h2>
+            <p>قبل از ورود، اندازه پوزیشن و نسبت سود به ضرر را دقیق ببین.</p>
+          </div>
+          <button onClick={onClose}><X /></button>
+        </div>
+        <div className="risk-calculator-body">
+          <div className="risk-form">
+            <label>موجودی حساب ($)<input type="number" step="any" value={values.balance} onChange={(event) => put("balance", event.target.value)} /></label>
+            <label>ریسک معامله (%)<input type="number" step="0.1" min="0" value={values.riskPercent} onChange={(event) => put("riskPercent", event.target.value)} /></label>
+            <label>قیمت ورود<input type="number" step="any" value={values.entry} onChange={(event) => put("entry", event.target.value)} placeholder="0.00" /></label>
+            <label>حد ضرر<input type="number" step="any" value={values.stop} onChange={(event) => put("stop", event.target.value)} placeholder="0.00" /></label>
+            <label className="wide">حد سود<input type="number" step="any" value={values.target} onChange={(event) => put("target", event.target.value)} placeholder="اختیاری" /></label>
+          </div>
+          <div className="risk-results">
+            <div className="risk-hero-result">
+              <span>حجم پیشنهادی</span>
+              <b>{positionSize ? positionSize.toLocaleString("en-US", { maximumFractionDigits: 4 }) : "—"}</b>
+              <small>واحد دارایی بر اساس فاصله حد ضرر</small>
+            </div>
+            <div><span>سرمایه در معرض ریسک</span><b className="red">{money(-riskCapital)}</b></div>
+            <div><span>نسبت سود به ضرر</span><b>{rewardRisk ? `${rewardRisk.toFixed(2)}R` : "—"}</b></div>
+            <div><span>سود بالقوه</span><b className="green">{rewardRisk ? money(potentialReward) : "—"}</b></div>
+          </div>
+          <div className="risk-safety"><ShieldCheck /><span><b>بدون تغییر در اطلاعاتت</b><small>این ابزار فقط محاسبه می‌کند و چیزی در ژورنال یا دیتابیس ذخیره نمی‌کند.</small></span></div>
+        </div>
+        <div className="modal-foot"><span /><button className="primary" onClick={onClose}><CheckCircle2 /> متوجه شدم</button></div>
+      </div>
+    </div>
+  );
+}
+
 function TradeModal({ trade, onSave, onDelete, onClose }) {
   const [f, setF] = useState(trade);
   const [imageBusy, setImageBusy] = useState(false);
