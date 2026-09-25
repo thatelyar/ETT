@@ -38,6 +38,8 @@ import {
   LogOut,
   Menu,
   Moon,
+  PanelRightClose,
+  PanelRightOpen,
   Plus,
   Search,
   Settings,
@@ -360,6 +362,10 @@ Object.assign(enMap, {
   "متوجه شدم": "Done",
   "برای اجرای پلن آماده‌ای": "You're ready to execute the plan",
   "چک‌لیست کامل است؛ ریسک تعریف‌شده را حفظ کن.": "Checklist complete. Keep risk within the plan.",
+  "باز کردن منوی کناری": "Open sidebar",
+  "بستن منوی کناری": "Close sidebar",
+  "باز کردن منوی کناری (⌘B)": "Open sidebar (⌘B)",
+  "بستن منوی کناری (⌘B)": "Close sidebar (⌘B)",
 });
 const toLatinDigits = (value) =>
   value.replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)]);
@@ -538,6 +544,9 @@ function App() {
   const [daySheet, setDaySheet] = useState(null);
   const [riskCalculatorOpen, setRiskCalculatorOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem("tradeflow_sidebar_collapsed") === "true",
+  );
   const [query, setQuery] = useState("");
   const [session, setSession] = useState(null);
   const [cloudReady, setCloudReady] = useState(!cloudEnabled);
@@ -615,11 +624,21 @@ function App() {
         event.preventDefault();
         searchRef.current?.focus();
       }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setSidebarCollapsed((current) => !current);
+      }
       if (event.key === "Escape") setRiskCalculatorOpen(false);
     };
     window.addEventListener("keydown", handleShortcut);
     return () => window.removeEventListener("keydown", handleShortcut);
   }, []);
+  useEffect(() => {
+    localStorage.setItem(
+      "tradeflow_sidebar_collapsed",
+      String(sidebarCollapsed),
+    );
+  }, [sidebarCollapsed]);
   useEffect(() => {
     if (!cloudEnabled) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -825,7 +844,7 @@ function App() {
     <div
       ref={appRef}
       key={language}
-      className="app"
+      className={`app ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}
       dir={language === "fa" ? "rtl" : "ltr"}
       lang={language}
       data-theme={theme}
@@ -847,6 +866,7 @@ function App() {
             <button
               key={id}
               className={view === id ? "active" : ""}
+              title={label}
               onClick={() => {
                 setView(id);
                 setMobileNav(false);
@@ -861,13 +881,14 @@ function App() {
         <div className="nav-bottom">
           <button
             className={view === "settings" ? "active" : ""}
+            title="تنظیمات"
             onClick={() => {
               setView("settings");
               setMobileNav(false);
             }}
           >
             <Settings />
-            تنظیمات
+            <span className="nav-label">تنظیمات</span>
           </button>
           <div
             className="profile"
@@ -897,6 +918,14 @@ function App() {
         <header>
           <button className="hamb" onClick={() => setMobileNav(true)}>
             <Menu />
+          </button>
+          <button
+            className="sidebar-toggle"
+            onClick={() => setSidebarCollapsed((current) => !current)}
+            aria-label={sidebarCollapsed ? "باز کردن منوی کناری" : "بستن منوی کناری"}
+            title={sidebarCollapsed ? "باز کردن منوی کناری (⌘B)" : "بستن منوی کناری (⌘B)"}
+          >
+            {sidebarCollapsed ? <PanelRightOpen /> : <PanelRightClose />}
           </button>
           <div className="search">
             <Search />
