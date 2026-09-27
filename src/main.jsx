@@ -59,6 +59,14 @@ import {
   saveCloudTrades,
   supabase,
 } from "./supabase";
+import {
+  DEFAULT_SESSION_CHECK,
+  getDueSessionChecks,
+  getNextSessionOpening,
+  SESSION_DEFINITIONS,
+  sessionAcknowledgementKey,
+  sessionRuleSignature,
+} from "./sessionGate.mjs";
 import "./styles.css";
 import "./theme.css";
 import "./responsive.css";
@@ -547,6 +555,8 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem("tradeflow_sidebar_collapsed") === "true",
   );
+  const [sessionClock, setSessionClock] = useState(() => Date.now());
+  const [, refreshSessionGate] = useState(0);
   const [query, setQuery] = useState("");
   const [session, setSession] = useState(null);
   const [cloudReady, setCloudReady] = useState(!cloudEnabled);
@@ -639,6 +649,19 @@ function App() {
       String(sidebarCollapsed),
     );
   }, [sidebarCollapsed]);
+  useEffect(() => {
+    const refresh = () => setSessionClock(Date.now());
+    const timer = window.setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
   useEffect(() => {
     if (!cloudEnabled) return;
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -838,6 +861,9 @@ function App() {
     ["analytics", "تحلیل عملکرد", BarChart3],
     ["playbook", "پلن معاملاتی", BookOpen],
   ];
+  const sessionOwner = session?.user?.id || "local";
+  const activeSessionCheck = getDueSessionChecks(plan.sessionChecks, sessionClock)
+    .find((due) => localStorage.getItem(sessionAcknowledgementKey(sessionOwner, due)) !== sessionRuleSignature(due));
   if (cloudEnabled && !session) return <AuthScreen />;
   if (cloudEnabled && !cloudReady) return <CloudLoading />;
   return (
@@ -849,7 +875,7 @@ function App() {
       lang={language}
       data-theme={theme}
     >
-      <aside className={mobileNav ? "open" : ""}>
+      <aside className={mobileNav ? "open" : ""} inert={Boolean(activeSessionCheck)}>
         <div className="brand">
           <span className="brand-mark">
             <TrendingUp />
@@ -914,7 +940,7 @@ function App() {
           </div>
         </div>
       </aside>
-      <main>
+      <main inert={Boolean(activeSessionCheck)}>
         <header>
           <button className="hamb" onClick={() => setMobileNav(true)}>
             <Menu />
@@ -1278,6 +1304,9 @@ function App() {
               setTheme={setTheme}
               language={language}
               setLanguage={setLanguage}
+              plan={plan}
+              setPlan={setPlan}
+              sessionClock={sessionClock}
               session={session}
               cloudState={cloudState}
               onLogout={logout}
@@ -1325,6 +1354,20 @@ function App() {
       )}
       {mobileNav && (
         <div className="scrim" onClick={() => setMobileNav(false)} />
+      )}
+      {activeSessionCheck && (
+        <SessionChecklistGate
+          key={`${sessionOwner}_${activeSessionCheck.id}_${activeSessionCheck.date}_${sessionRuleSignature(activeSessionCheck)}`}
+          due={activeSessionCheck}
+          language={language}
+          onComplete={() => {
+            localStorage.setItem(
+              sessionAcknowledgementKey(sessionOwner, activeSessionCheck),
+              sessionRuleSignature(activeSessionCheck),
+            );
+            refreshSessionGate((value) => value + 1);
+          }}
+        />
       )}
     </div>
   );
@@ -1842,13 +1885,16 @@ function SettingsPage({
   setTheme,
   language,
   setLanguage,
+  plan,
+  setPlan,
+  sessionClock,
   session,
   cloudState,
   onLogout,
 }) {
   const exportData = () => {
     const blob = new Blob(
-      [JSON.stringify({ profile, balance, trades }, null, 2)],
+      [JSON.stringify({ profile, balance, plan, trades }, null, 2)],
       { type: "application/json" },
     );
     const a = document.createElement("a");
@@ -1911,6 +1957,28 @@ function SettingsPage({
             </button>
           </div>
         </div>
+      </section>
+      <section className="session-settings-section">
+        <div className="session-settings-heading">
+          <span className="session-settings-icon"><ShieldCheck /></span>
+          <div>
+            <h2>{language === "fa" ? "قوانین پیش از سشن" : "Pre-session rules"}</h2>
+            <p>{language === "fa" ? "نیم ساعت قبل از شروع هر سشن، چک‌لیست همان سشن صفحه را قفل می‌کند تا همه قوانین را تأیید کنی." : "A checklist locks the app 30 minutes before each session until you confirm every rule."}</p>
+          </div>
+        </div>
+        <div className="session-settings-grid">
+          {Object.keys(SESSION_DEFINITIONS).map((id) => (
+            <SessionRulesSettings
+              key={id}
+              id={id}
+              plan={plan}
+              setPlan={setPlan}
+              now={sessionClock}
+              language={language}
+            />
+          ))}
+        </div>
+        <p className="session-settings-footnote">{language === "fa" ? "ساعت شروع به وقت محلی لندن یا نیویورک است. زمان ایران با تغییر ساعت فصلی خودکار محاسبه می‌شود. یادآور فقط زمانی نمایش داده می‌شود که سایت باز باشد." : "Opening times use local London or New York time. Iran times adjust for daylight saving. The reminder appears while the site is open."}</p>
       </section>
       <section className="settings-grid">
         <div className="panel settings-form">
@@ -1978,6 +2046,155 @@ function SettingsPage({
           </div>
         </div>
       </section>
+    </div>
+  );
+}
+
+function SessionRulesSettings({ id, plan, setPlan, now, language }) {
+  const [newRule, setNewRule] = useState("");
+  const definition = SESSION_DEFINITIONS[id];
+  const config = { ...DEFAULT_SESSION_CHECK, ...plan.sessionChecks?.[id] };
+  const rules = Array.isArray(config.rules) ? config.rules : [];
+  const nextOpening = getNextSessionOpening(id, config, now);
+  const nextTrigger = nextOpening === null ? null : nextOpening - 30 * 60 * 1000;
+  const formatIran = (instant) => new Intl.DateTimeFormat(language === "fa" ? "fa-IR" : "en-GB", {
+    timeZone: "Asia/Tehran", weekday: "long", month: "short", day: "numeric",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(instant));
+  const update = (patch) => setPlan((current) => ({
+    ...current,
+    sessionChecks: {
+      ...current.sessionChecks,
+      [id]: { ...DEFAULT_SESSION_CHECK, ...current.sessionChecks?.[id], ...patch },
+    },
+  }));
+  const addRule = (event) => {
+    event.preventDefault();
+    const rule = newRule.trim();
+    if (!rule || rules.some((item) => item.toLocaleLowerCase() === rule.toLocaleLowerCase())) return;
+    update({ rules: [...rules, rule] });
+    setNewRule("");
+  };
+  return (
+    <div className="panel session-settings-card">
+      <div className="session-settings-card-head">
+        <div className="session-city-icon"><Clock3 /></div>
+        <div>
+          <span>{definition.english.toUpperCase()} SESSION</span>
+          <h3>{language === "fa" ? `سشن ${definition.label}` : `${definition.english} session`}</h3>
+        </div>
+        <span className="session-switch-status">{config.enabled && rules.length ? (language === "fa" ? "فعال" : "On") : (language === "fa" ? "خاموش" : "Off")}</span>
+        <label className="session-switch">
+          <input
+            type="checkbox"
+            checked={Boolean(config.enabled && rules.length)}
+            disabled={!rules.length}
+            onChange={(event) => update({ enabled: event.target.checked })}
+            aria-label={language === "fa" ? `فعال‌سازی سشن ${definition.label}` : `Enable ${definition.english} session`}
+          />
+          <span />
+        </label>
+      </div>
+      <div className="session-time-row">
+        <label>
+          {language === "fa" ? "ساعت شروع به وقت محلی" : "Local opening time"}
+          <input type="time" value={config.open || "08:00"} onChange={(event) => update({ open: event.target.value })} />
+        </label>
+        <span>{language === "fa" ? "دوشنبه تا جمعه" : "Monday to Friday"}</span>
+      </div>
+      <div className="session-iran-preview">
+        <CalendarDays />
+        <div>
+          <small>{language === "fa" ? "نوبت بعدی به وقت ایران" : "Next session in Iran"}</small>
+          <b>{nextOpening === null ? "—" : formatIran(nextOpening)}</b>
+          <span>{language === "fa" ? "نمایش چک‌لیست:" : "Checklist opens:"} {nextTrigger === null ? "—" : formatIran(nextTrigger)}</span>
+        </div>
+      </div>
+      <div className="session-rules-title">
+        <b>{language === "fa" ? "قوانین این سشن" : "Session rules"}</b>
+        <small>{language === "fa" ? `${faDigits(rules.length)} قانون` : `${rules.length} rules`}</small>
+      </div>
+      {rules.length ? (
+        <div className="session-edit-rules">
+          {rules.map((rule, index) => (
+            <div className="session-edit-rule" key={`${id}-${index}`}>
+              <span>{faDigits(index + 1).padStart(2, "۰")}</span>
+              <input
+                aria-label={language === "fa" ? `قانون ${faDigits(index + 1)} سشن ${definition.label}` : `Rule ${index + 1} for ${definition.english}`}
+                value={rule}
+                onChange={(event) => update({ rules: rules.map((item, itemIndex) => itemIndex === index ? event.target.value : item) })}
+                onBlur={() => update({ rules: rules.map((item) => item.trim()).filter(Boolean) })}
+              />
+              <button type="button" aria-label={language === "fa" ? "حذف قانون" : "Delete rule"} onClick={() => {
+                const remaining = rules.filter((_, itemIndex) => itemIndex !== index);
+                update({ rules: remaining, enabled: remaining.length ? config.enabled : false });
+              }}><Trash2 /></button>
+            </div>
+          ))}
+        </div>
+      ) : <p className="session-empty-rules">{language === "fa" ? "اولین قانون را اضافه کن، سپس سوییچ بالا را روشن کن." : "Add a rule, then turn on the switch above."}</p>}
+      <form className="session-add-rule" onSubmit={addRule}>
+        <input value={newRule} onChange={(event) => setNewRule(event.target.value)} placeholder={language === "fa" ? "قانون جدید برای این سشن..." : "New rule for this session..."} />
+        <button type="submit" aria-label={language === "fa" ? "افزودن قانون" : "Add rule"}><Plus /></button>
+      </form>
+    </div>
+  );
+}
+
+function SessionChecklistGate({ due, language, onComplete }) {
+  const [checked, setChecked] = useState([]);
+  const dialogRef = useRef(null);
+  const definition = SESSION_DEFINITIONS[due.id];
+  const allChecked = due.rules.length > 0 && checked.length === due.rules.length;
+  const openingIran = new Intl.DateTimeFormat(language === "fa" ? "fa-IR" : "en-GB", {
+    timeZone: "Asia/Tehran", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).format(new Date(due.opening));
+  useEffect(() => {
+    dialogRef.current?.querySelector("input")?.focus();
+    const keepFocus = (event) => {
+      if (event.key !== "Tab") return;
+      const focusable = [...dialogRef.current.querySelectorAll("input, button:not(:disabled)")];
+      if (!focusable.length) return;
+      if (event.shiftKey && document.activeElement === focusable[0]) {
+        event.preventDefault(); focusable.at(-1).focus();
+      } else if (!event.shiftKey && document.activeElement === focusable.at(-1)) {
+        event.preventDefault(); focusable[0].focus();
+      }
+    };
+    window.addEventListener("keydown", keepFocus);
+    return () => window.removeEventListener("keydown", keepFocus);
+  }, []);
+  return (
+    <div className="session-gate-wrap">
+      <div className="session-gate modal" role="dialog" aria-modal="true" aria-labelledby="session-gate-title" ref={dialogRef}>
+        <div className="session-gate-top">
+          <span className="session-gate-badge"><ShieldCheck /> {language === "fa" ? "پیش از سشن" : "PRE-SESSION CHECK"}</span>
+          <span className="session-gate-city">{definition.english.toUpperCase()}</span>
+        </div>
+        <div className="session-gate-intro">
+          <div className="session-gate-emblem"><Clock3 /></div>
+          <h2 id="session-gate-title">{language === "fa" ? `آمادهٔ سشن ${definition.label} هستی؟` : `Ready for the ${definition.english} session?`}</h2>
+          <p>{language === "fa" ? `شروع سشن به وقت ایران: ${openingIran}. قوانینت را با دقت بخوان و یک‌به‌یک تأیید کن.` : `Session opens at ${openingIran} Iran time. Read and confirm each rule.`}</p>
+        </div>
+        <div className="session-gate-progress">
+          <span>{language === "fa" ? "پیشرفت چک‌لیست" : "Checklist progress"}</span>
+          <b>{language === "fa" ? `${faDigits(checked.length)} از ${faDigits(due.rules.length)}` : `${checked.length} of ${due.rules.length}`}</b>
+          <div><i style={{ width: `${checked.length / due.rules.length * 100}%` }} /></div>
+        </div>
+        <div className="session-gate-rules">
+          {due.rules.map((rule, index) => (
+            <label key={`${index}-${rule}`} className={checked.includes(index) ? "checked" : ""}>
+              <input type="checkbox" checked={checked.includes(index)} onChange={() => setChecked((current) => current.includes(index) ? current.filter((item) => item !== index) : [...current, index])} />
+              <span className="session-gate-check"><CheckCircle2 /></span>
+              <span className="session-gate-rule"><small>{language === "fa" ? `قانون ${faDigits(index + 1)}` : `RULE ${index + 1}`}</small><strong>{rule}</strong></span>
+            </label>
+          ))}
+        </div>
+        <button className="session-gate-confirm" type="button" disabled={!allChecked} onClick={onComplete}>
+          <ShieldCheck /> {language === "fa" ? "همه قوانین را خواندم؛ ورود به ژورنال" : "I read every rule; enter the journal"}
+        </button>
+        <p className="session-gate-note">{language === "fa" ? "این تأیید فقط برای سشن امروز ثبت می‌شود." : "This confirmation applies to today's session only."}</p>
+      </div>
     </div>
   );
 }
