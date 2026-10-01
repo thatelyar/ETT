@@ -1141,3 +1141,48 @@ tbody tr:hover,
   .session-gate-intro h2 { font-size: 19px; }
   .session-gate-rules { max-height: 37dvh; }
 }
+
+.backtest-workspace { display: grid; gap: 18px; }
+.backtest-workspace > .page-title { margin-bottom: 0; }
+.backtest-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border: 1px solid rgba(111, 91, 255, .23); border-radius: 17px; background: linear-gradient(110deg, rgba(111, 91, 255, .12), rgba(40, 192, 218, .07) 65%, var(--surface)); box-shadow: var(--shadow-sm); }
+.backtest-mode-pill { display: inline-flex; align-items: center; gap: 8px; color: var(--accent); font-size: 11px; font-weight: 800; }
+.backtest-mode-pill svg { width: 18px; height: 18px; }
+.backtest-toolbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.backtest-toolbar-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 39px; padding: 0 14px; border-radius: 10px; font-size: 10px; font-weight: 800; transition: transform .18s, border-color .18s, box-shadow .18s; }
+.backtest-toolbar-actions button:hover { transform: translateY(-2px); }
+.backtest-toolbar-actions svg { width: 15px; height: 15px; }
+.backtest-backup { color: var(--text-strong); border: 1px solid var(--border-strong); background: var(--surface-solid); }
+.backtest-backup:hover { border-color: var(--accent); box-shadow: var(--shadow-sm); }
+.backtest-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.backtest-summary-card { display: flex; flex-direction: column; min-width: 0; min-height: 120px; gap: 10px; padding: 18px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow-sm); }
+.backtest-summary-card > span:first-child { display: inline-flex; align-items: center; gap: 7px; color: var(--text-soft); font-size: 10px; font-weight: 750; }
+.backtest-summary-card > span:first-child svg { width: 16px; height: 16px; color: var(--accent); }
+.backtest-summary-card > b { color: var(--text-strong); font-size: clamp(17px, 2vw, 24px); font-weight: 850; direction: ltr; text-align: right; line-height: 1.1; }
+.backtest-summary-card > b.green { color: var(--green); }
+.backtest-summary-card > b.red { color: var(--red); }
+.backtest-summary-card > small { margin-top: auto; color: var(--text-soft); font-size: 9px; }
+.backtest-balance > div { display: flex; align-items: center; gap: 3px; direction: ltr; }
+.backtest-balance > div > span { color: var(--accent); font-size: 18px; font-weight: 800; }
+.backtest-balance input { width: 100%; min-width: 0; padding: 0 5px; color: var(--text-strong); border: 0; border-bottom: 1px solid var(--border-strong); outline: 0; background: transparent; font: inherit; font-size: 21px; font-weight: 850; }
+.backtest-balance input:focus { border-color: var(--accent); }
+.backtest-tabs { display: inline-flex; justify-self: start; gap: 5px; padding: 5px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-raised); }
+.backtest-tabs button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 37px; padding: 0 15px; color: var(--text-soft); border: 0; border-radius: 9px; background: transparent; font-size: 10px; font-weight: 800; transition: color .18s, background .18s, box-shadow .18s; }
+.backtest-tabs button:hover { color: var(--accent); }
+.backtest-tabs button.active { color: var(--accent); background: var(--surface-solid); box-shadow: var(--shadow-sm); }
+.backtest-tabs svg { width: 15px; height: 15px; }
+.backtest-workspace > .view-page { margin-top: 0; }
+
+@media (max-width: 980px) {
+  .backtest-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .backtest-workspace { gap: 14px; }
+  .backtest-toolbar { align-items: flex-start; flex-direction: column; padding: 14px; }
+  .backtest-toolbar-actions { width: 100%; }
+  .backtest-toolbar-actions button { flex: 1 1 auto; }
+  .backtest-summary-grid { gap: 8px; }
+  .backtest-summary-card { min-height: 112px; padding: 13px; }
+  .backtest-summary-card > b { font-size: 18px; }
+  .backtest-tabs { display: flex; justify-self: stretch; }
+  .backtest-tabs button { flex: 1; padding: 0 7px; }
+}

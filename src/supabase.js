@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { partitionJournalTrades, tradeBelongsToJournal } from "./tradeJournal.mjs";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -18,9 +19,7 @@ export async function loadCloudData(userId) {
     ]);
   if (settingsError) throw settingsError;
   if (tradesError) throw tradesError;
-  return {
-    settings,
-    trades: (trades || []).map((trade) => ({
+  const mappedTrades = (trades || []).map((trade) => ({
       id: trade.id,
       date: trade.trade_date,
       market: trade.market,
@@ -33,8 +32,8 @@ export async function loadCloudData(userId) {
       emotion: trade.emotion || "",
       notes: trade.notes || "",
       image: trade.image || "",
-    })),
-  };
+    }));
+  return { settings, ...partitionJournalTrades(mappedTrades) };
 }
 
 export async function saveCloudSettings(userId, { profile, balance, plan }) {
@@ -48,7 +47,12 @@ export async function saveCloudSettings(userId, { profile, balance, plan }) {
   if (error) throw error;
 }
 
-export async function saveCloudTrades(userId, trades) {
+export async function saveCloudTrades(userId, trades, journal = "live") {
+  if (journal !== "live" && journal !== "backtest") throw new Error("Unknown trade journal");
+  if (!trades.every((trade) => tradeBelongsToJournal(trade, journal))) {
+    throw new Error(`A ${journal} save included a trade from another journal`);
+  }
+  const inJournal = (query) => journal === "backtest" ? query.lt("id", 0) : query.gte("id", 0);
   const rows = trades.map((trade) => ({
     id: Number(trade.id),
     user_id: userId,
@@ -65,15 +69,15 @@ export async function saveCloudTrades(userId, trades) {
     image: trade.image || "",
     updated_at: new Date().toISOString(),
   }));
-  const { data: existing, error: readError } = await supabase
+  const { data: existing, error: readError } = await inJournal(supabase
     .from("trades")
     .select("id")
-    .eq("user_id", userId);
+    .eq("user_id", userId));
   if (readError) throw readError;
   const currentIds = new Set(rows.map((row) => row.id));
-  const removedIds = (existing || []).map((row) => row.id).filter((id) => !currentIds.has(id));
+  const removedIds = (existing || []).map((row) => Number(row.id)).filter((id) => !currentIds.has(id));
   if (removedIds.length) {
-    const { error } = await supabase.from("trades").delete().eq("user_id", userId).in("id", removedIds);
+    const { error } = await inJournal(supabase.from("trades").delete().eq("user_id", userId)).in("id", removedIds);
     if (error) throw error;
   }
   if (rows.length) {

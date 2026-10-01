@@ -31,6 +31,7 @@ import {
   Command,
   Download,
   Flame,
+  FlaskConical,
   Gauge,
   ImagePlus,
   LayoutDashboard,
@@ -67,6 +68,9 @@ import {
   sessionAcknowledgementKey,
   sessionRuleSignature,
 } from "./sessionGate.mjs";
+import { nextBacktestTradeId } from "./tradeJournal.mjs";
+import { translateUI } from "./translation.mjs";
+import { createJournalViews } from "./journalViews.jsx";
 import "./styles.css";
 import "./theme.css";
 import "./responsive.css";
@@ -158,262 +162,6 @@ async function prepareTradeImage(file) {
   }
 }
 
-const enMap = {
-  "نمای کلی": "Overview",
-  "ژورنال معاملاتی": "Trading Journal",
-  "تحلیل عملکرد": "Performance Analytics",
-  "پلن معاملاتی": "Trading Plan",
-  تنظیمات: "Settings",
-  جدید: "New",
-  "حساب حرفه‌ای": "Pro account",
-  "ژورنال حرفه‌ای معامله‌گری": "Professional trading journal",
-  "بازار باز است": "Market is open",
-  "ثبت معامله": "Add trade",
-  "دانلود عکس": "Download image",
-  "جستجو در معاملات...": "Search trades...",
-  "موجودی حساب": "Account balance",
-  "موجودی فعلی": "Current balance",
-  "سرمایه اولیه": "Initial balance",
-  "سود و زیان کل": "Total P&L",
-  "سود خالص ماه": "Monthly net P&L",
-  "نرخ برد": "Win rate",
-  "نسبت سود به ضرر": "Profit factor",
-  "روند موجودی": "Equity curve",
-  "خلاصه ماه": "Monthly summary",
-  بردها: "Wins",
-  باخت‌ها: "Losses",
-  "میانگین برد": "Average win",
-  "میانگین باخت": "Average loss",
-  "تقویم معاملاتی": "Trading calendar",
-  "عملکرد روزانه و ثبت معاملات": "Daily performance and trades",
-  "مشاهده همه": "View all",
-  سودده: "Profit",
-  زیان‌ده: "Loss",
-  "بدون معامله": "No trade",
-  "آخرین معاملات": "Recent trades",
-  "جدیدترین فعالیت‌های شما": "Your latest activity",
-  "بینش هوشمند": "Smart insight",
-  "مشاهده تحلیل کامل": "View full analysis",
-  خرید: "Buy",
-  فروش: "Sell",
-  ژورنال: "Journal",
-  "همه معاملات، یک‌جا": "All your trades in one place",
-  "روزهای معاملاتی را مرور، جستجو و ویرایش کن.":
-    "Review, search and edit your trading days.",
-  "تقویم ماهانه": "Monthly calendar",
-  "لیست معاملات": "Trade history",
-  "برای مشاهده جزئیات روی هر ردیف کلیک کنید": "Click a row to view details",
-  تاریخ: "Date",
-  بازار: "Market",
-  نوع: "Side",
-  ستاپ: "Setup",
-  ریسک: "Risk",
-  نتیجه: "Result",
-  "معامله‌ای برای این ماه ثبت نشده است.": "No trades recorded this month.",
-  "اعداد، داستان معاملاتت را می‌گویند": "Your numbers tell the story",
-  "تمام گزارش‌ها مستقیماً از معاملات ثبت‌شده محاسبه شده‌اند.":
-    "All reports are calculated from your recorded trades.",
-  "Profit Factor": "Profit Factor",
-  "کل معاملات": "Total trades",
-  "تمام دوره": "All time",
-  "منحنی موجودی": "Equity curve",
-  "روند عملکرد حساب": "Account performance trend",
-  "جهت معاملات": "Trade direction",
-  "عملکرد خرید و فروش": "Long and short performance",
-  "عملکرد بازارها": "Market performance",
-  "سود و زیان به تفکیک نماد": "P&L by symbol",
-  "بهترین ستاپ‌ها": "Top setups",
-  "رتبه‌بندی استراتژی‌های ثبت‌شده": "Strategy ranking",
-  "پلن معاملاتی": "Trading Plan",
-  "قوانینی که از سرمایه‌ات محافظت می‌کنند": "Rules that protect your capital",
-  "قبل از شروع سشن، محدودیت‌ها و چک‌لیست خودت را مرور کن.":
-    "Review your limits and checklist before each session.",
-  "مدیریت ریسک": "Risk management",
-  "محدودیت‌های اصلی حساب": "Core account limits",
-  "حداکثر ریسک هر معامله (%)": "Max risk per trade (%)",
-  "حداکثر زیان روزانه (%)": "Max daily loss (%)",
-  "ساعت مجاز معامله": "Trading hours",
-  "چک‌لیست قبل از ورود": "Pre-trade checklist",
-  "قوانین قابل ویرایش شما": "Your editable rules",
-  "قانون جدید...": "New rule...",
-  افزودن: "Add",
-  "وضعیت آمادگی امروز": "Today's readiness",
-  "قبل از اولین معامله، تمام قوانین را علامت بزن":
-    "Check every rule before your first trade",
-  "حساب و اطلاعات شما": "Your account and data",
-  "تنظیمات شخصی و داده‌های ژورنال را مدیریت کن.":
-    "Manage your preferences and journal data.",
-  "پروفایل معامله‌گر": "Trader profile",
-  "اطلاعات نمایشی حساب": "Public account information",
-  "نام و نام خانوادگی": "Full name",
-  "واحد پول": "Currency",
-  "دلار آمریکا (USD)": "US Dollar (USD)",
-  "یورو (EUR)": "Euro (EUR)",
-  "تومان (IRT)": "Toman (IRT)",
-  "تغییرات به‌صورت خودکار ذخیره می‌شوند.": "Changes are saved automatically.",
-  "مدیریت داده‌ها": "Data management",
-  "دریافت نسخه پشتیبان JSON": "Download JSON backup",
-  "پاک‌کردن معاملات": "Delete trades",
-  "حذف همه معاملات": "Delete all trades",
-  "ثبت در ژورنال": "Journal entry",
-  "معامله جدید": "New trade",
-  "ویرایش معامله": "Edit trade",
-  "اطلاعات معامله را دقیق وارد کنید": "Enter your trade details accurately",
-  "اسکرین‌شات چارت": "Chart screenshot",
-  "برای انتخاب تصویر کلیک کنید": "Click to select an image",
-  "نوع پوزیشن": "Position side",
-  "قیمت ورود": "Entry price",
-  "قیمت خروج": "Exit price",
-  "سود / زیان ($)": "Profit / Loss ($)",
-  "میزان ریسک ($)": "Risk amount ($)",
-  "ستاپ معاملاتی": "Trading setup",
-  "حالت ذهنی": "Mindset",
-  "یادداشت معامله": "Trade notes",
-  انصراف: "Cancel",
-  "ذخیره معامله": "Save trade",
-  حذف: "Delete",
-  متمرکز: "Focused",
-  آرام: "Calm",
-  مطمئن: "Confident",
-  عجول: "Impatient",
-  خسته: "Tired",
-  شروع: "Start",
-  سود: "Profit",
-  زیان: "Loss",
-  عالی: "Excellent",
-  مثبت: "Positive",
-  "نیاز به بهبود": "Needs improvement",
-  روشن: "Light",
-  دارک: "Dark",
-  فارسی: "Persian",
-  انگلیسی: "English",
-  "ظاهر برنامه": "Appearance",
-  "زبان برنامه": "Language",
-};
-Object.assign(enMap, {
-  "معاملات روز": "Daily trades",
-  "افزودن معامله دیگر": "Add another trade",
-  بستن: "Close",
-  "بدون ستاپ": "No setup",
-  "سه‌شنبه، ۱۰ شهریور ۱۴۰۵": "Tuesday, September 1, 2026",
-  "سلام الیار، آماده‌ای بازار رو شکست بدی؟ 👋":
-    "Hi Elyar, ready to beat the market? 👋",
-  "عملکردت این ماه عالیه. همین روند رو ادامه بده.":
-    "Your performance looks great this month. Keep it up.",
-  "تداوم ژورنال‌نویسی": "Journal streak",
-  "برای تغییر روی عدد کلیک کنید": "Click the number to edit",
-  "بر اساس معاملات این ماه": "Based on this month's trades",
-  "بر اساس معاملات ثبت‌شده این ماه": "Based on trades recorded this month",
-  "بهترین عملکردت در سشن لندن بوده":
-    "Your best performance is during the London session",
-  "نرخ برد شما بین ساعت ۱۱ تا ۱۴، حدود ۲۳٪ بیشتر از میانگین است.":
-    "Your win rate from 11:00 to 14:00 is about 23% above average.",
-  "برای ثبت یا مشاهده معامله روی روز مورد نظر کلیک کنید":
-    "Select a day to add or review trades",
-  شنبه: "Sat",
-  یکشنبه: "Sun",
-  دوشنبه: "Mon",
-  سه‌شنبه: "Tue",
-  چهارشنبه: "Wed",
-  پنجشنبه: "Thu",
-  جمعه: "Fri",
-  ش: "S",
-  ی: "S",
-  د: "M",
-  س: "T",
-  چ: "W",
-  پ: "T",
-  ج: "F",
-  ژانویه: "January",
-  فوریه: "February",
-  مارس: "March",
-  آوریل: "April",
-  مه: "May",
-  ژوئن: "June",
-  ژوئیه: "July",
-  اوت: "August",
-  سپتامبر: "September",
-  اکتبر: "October",
-  نوامبر: "November",
-  دسامبر: "December",
-  "میز کار حرفه‌ای معامله‌گر": "Professional trading workspace",
-  "برآیند ماهت مثبت است؛ کیفیت اجرا را حفظ کن.": "Your month is positive; protect execution quality.",
-  "روی کنترل ریسک و اجرای بدون هیجان تمرکز کن.": "Focus on risk control and calm execution.",
-  "محاسبه ریسک": "Risk calculator",
-  "ماشین حساب ریسک": "Risk calculator",
-  "همگام و امن": "Synced & secure",
-  "در حال ذخیره": "Saving",
-  "ذخیره محلی": "Saved locally",
-  "امتیاز عملکرد": "Performance score",
-  "لبهٔ قوی": "Strong edge",
-  "رو به رشد": "Improving",
-  "در حال ساخت": "Building your edge",
-  "ترکیبی از نرخ برد، سوددهی و نظم ژورنال‌نویسی": "A blend of win rate, profitability, and journal consistency",
-  "امید ریاضی هر معامله": "Trade expectancy",
-  "بازده به ریسک واقعی": "Realized risk return",
-  "بیشترین افت ماه": "Monthly max drawdown",
-  "محاسبه حجم معامله": "Calculate position size",
-  "کوچ هوشمند": "Smart coach",
-  "امید ریاضی": "Expectancy",
-  "میانگین خروجی هر معامله": "Average outcome per trade",
-  "توان جبران افت سرمایه": "Drawdown recovery strength",
-  "بازده کل": "Total return",
-  "نسبت به سرمایه اولیه": "Relative to starting balance",
-  "ماشین حساب حجم و ریسک": "Position size & risk calculator",
-  "قبل از ورود، اندازه پوزیشن و نسبت سود به ضرر را دقیق ببین.": "Size the position and preview reward-to-risk before entry.",
-  "حجم پیشنهادی": "Suggested position size",
-  "واحد دارایی بر اساس فاصله حد ضرر": "Asset units based on stop distance",
-  "سرمایه در معرض ریسک": "Capital at risk",
-  "سود بالقوه": "Potential reward",
-  "بدون تغییر در اطلاعاتت": "Your data stays unchanged",
-  "این ابزار فقط محاسبه می‌کند و چیزی در ژورنال یا دیتابیس ذخیره نمی‌کند.": "This tool only calculates and saves nothing to your journal or database.",
-  "متوجه شدم": "Done",
-  "برای اجرای پلن آماده‌ای": "You're ready to execute the plan",
-  "چک‌لیست کامل است؛ ریسک تعریف‌شده را حفظ کن.": "Checklist complete. Keep risk within the plan.",
-  "باز کردن منوی کناری": "Open sidebar",
-  "بستن منوی کناری": "Close sidebar",
-  "باز کردن منوی کناری (⌘B)": "Open sidebar (⌘B)",
-  "بستن منوی کناری (⌘B)": "Close sidebar (⌘B)",
-});
-const toLatinDigits = (value) =>
-  value.replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)]);
-function dynamicEnglish(value) {
-  let out = enMap[value] || value;
-  out = out
-    .replace(/سلام (.+)، امروز با پلن جلو می‌ریم\./g, "Hi $1, let's trade the plan today.")
-    .replace(/(.+) لبهٔ معاملاتی این ماه توست/g, "$1 is your edge this month")
-    .replace(/(\S+) معامله با نرخ برد (\S+)٪ و نتیجهٔ (.+) ثبت شده است\./g, "$1 trades at a $2% win rate, returning $3.")
-    .replace(/(\S+) معامله در این ماه/g, "$1 trades this month")
-    .replace(/از (\S+) معامله/g, "from $1 trades")
-    .replace(/(\S+) معامله ذخیره‌شده/g, "$1 saved trades")
-    .replace(/(\S+) معامله/g, "$1 trades")
-    .replace(/(\S+) برد/g, "$1 wins")
-    .replace(/(\S+) روز/g, "$1 days")
-    .replace(/نتیجه کل/g, "Total result")
-    .replace(/معامله (\S+)/g, "Trade $1");
-  for (const [fa, en] of Object.entries(enMap))
-    if (fa.length > 1 && out.includes(fa)) out = out.replaceAll(fa, en);
-  return toLatinDigits(out);
-}
-function translateUI(root) {
-  if (!root) return;
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let node;
-  while ((node = walker.nextNode())) {
-    const raw = node.nodeValue,
-      trim = raw.trim();
-    const translated = dynamicEnglish(trim);
-    if (translated !== trim) node.nodeValue = raw.replace(trim, translated);
-  }
-  root
-    .querySelectorAll("[placeholder],[data-label],[title],[aria-label]")
-    .forEach((el) => {
-      for (const attr of ["placeholder", "data-label", "title", "aria-label"]) {
-        const value = el.getAttribute(attr);
-        if (value) el.setAttribute(attr, dynamicEnglish(value));
-      }
-    });
-}
 const demoTrades = [
   {
     id: 1,
@@ -527,6 +275,10 @@ function Spark({ down = false }) {
   );
 }
 
+const { BacktestPage, JournalPage, AnalyticsPage } = createJournalViews({
+  faDigits, money, monthNames, getMaxDrawdown, PageTitle, PanelHead, Calendar, Stat,
+});
+
 function App() {
   const appRef = useRef(null);
   const searchRef = useRef(null);
@@ -543,13 +295,24 @@ function App() {
       return demoTrades;
     }
   });
+  const [backtestTrades, setBacktestTrades] = useState(() => {
+    if (cloudEnabled) return [];
+    try {
+      return JSON.parse(localStorage.getItem("tradeflow_backtest_trades")) || [];
+    } catch {
+      return [];
+    }
+  });
   const [accountBalance, setAccountBalance] = useState(() =>
     Number(localStorage.getItem("tradeflow_balance") || 0),
   );
   const [view, setView] = useState("dashboard");
   const [month, setMonth] = useState(new Date(2026, 8, 1));
+  const [backtestMonth, setBacktestMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const [modal, setModal] = useState(null);
   const [daySheet, setDaySheet] = useState(null);
+  const [backtestModal, setBacktestModal] = useState(null);
+  const [backtestDaySheet, setBacktestDaySheet] = useState(null);
   const [riskCalculatorOpen, setRiskCalculatorOpen] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
@@ -558,6 +321,7 @@ function App() {
   const [sessionClock, setSessionClock] = useState(() => Date.now());
   const [, refreshSessionGate] = useState(0);
   const [query, setQuery] = useState("");
+  const [backtestQuery, setBacktestQuery] = useState("");
   const [session, setSession] = useState(null);
   const [cloudReady, setCloudReady] = useState(!cloudEnabled);
   const [cloudState, setCloudState] = useState(cloudEnabled ? "loading" : "local");
@@ -608,6 +372,22 @@ function App() {
       }
     }
   }, [trades]);
+  useEffect(() => {
+    if (cloudEnabled && (!cloudReady || !session?.user?.id)) return;
+    const key = cloudEnabled ? `tradeflow_backtest_trades_${session.user.id}` : "tradeflow_backtest_trades";
+    try {
+      localStorage.setItem(key, JSON.stringify(backtestTrades));
+    } catch (error) {
+      console.warn("Local backtest cache exceeded its quota", error);
+      if (cloudEnabled) {
+        try {
+          localStorage.setItem(key, JSON.stringify(backtestTrades.map((trade) => ({ ...trade, image: "" }))));
+        } catch (fallbackError) {
+          console.warn("Unable to update the local backtest cache", fallbackError);
+        }
+      }
+    }
+  }, [backtestTrades, cloudReady, session?.user?.id]);
   useEffect(
     () => localStorage.setItem("tradeflow_balance", String(accountBalance)),
     [accountBalance],
@@ -676,24 +456,27 @@ function App() {
     let active = true;
     setCloudState("loading");
     loadCloudData(session.user.id)
-      .then(async ({ settings, trades: remoteTrades }) => {
+      .then(async ({ settings, trades: remoteTrades, backtestTrades: remoteBacktestTrades }) => {
         if (!active) return;
         const hasLocalTrades = localStorage.getItem("tradeflow_trades") !== null;
-        const hasRemoteData = Boolean(settings || remoteTrades.length);
+        const hasRemoteData = Boolean(settings || remoteTrades.length || remoteBacktestTrades.length);
         if (hasRemoteData) {
           setTrades(remoteTrades);
+          setBacktestTrades(remoteBacktestTrades);
           if (settings) {
             setProfile(settings.profile);
             setAccountBalance(Number(settings.balance || 0));
             setPlan(settings.plan);
           }
         } else if (hasLocalTrades) {
+          setBacktestTrades([]);
           await Promise.all([
             saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan }),
             saveCloudTrades(session.user.id, trades),
           ]);
         } else {
           setTrades([]);
+          setBacktestTrades([]);
           await saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan });
         }
         if (active) {
@@ -717,6 +500,7 @@ function App() {
       Promise.all([
         saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan }),
         saveCloudTrades(session.user.id, trades),
+        saveCloudTrades(session.user.id, backtestTrades, "backtest"),
       ])
         .then(() => setCloudState("synced"))
         .catch((error) => {
@@ -725,7 +509,7 @@ function App() {
         });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [trades, accountBalance, profile, plan, cloudReady, session?.user?.id]);
+  }, [trades, backtestTrades, accountBalance, profile, plan, cloudReady, session?.user?.id]);
   useLayoutEffect(() => {
     if (language === "en") translateUI(appRef.current);
   }, [
@@ -733,10 +517,14 @@ function App() {
     view,
     modal,
     daySheet,
+    backtestModal,
+    backtestDaySheet,
     trades,
+    backtestTrades,
     plan,
     profile,
     month,
+    backtestMonth,
     accountBalance,
   ]);
   const monthTrades = useMemo(
@@ -850,14 +638,44 @@ function App() {
     if (dayTrades.length) setDaySheet({ date });
     else newTrade(date);
   }
+  function saveBacktest(data) {
+    setBacktestTrades((current) => data.id
+      ? current.map((trade) => trade.id === data.id ? data : trade)
+      : [...current, { ...data, id: nextBacktestTradeId(current) }]);
+    const date = new Date(`${data.date}T12:00:00`);
+    if (!Number.isNaN(date.getTime())) setBacktestMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+    setBacktestModal(null);
+  }
+  function newBacktestTrade(date) {
+    setBacktestModal({
+      date,
+      market: "XAU/USD",
+      side: "Long",
+      entry: "",
+      exit: "",
+      pnl: "",
+      risk: "",
+      setup: "",
+      emotion: "متمرکز",
+      notes: "",
+      image: "",
+    });
+  }
+  function openBacktestDay(date, dayTrades = []) {
+    if (dayTrades.length) setBacktestDaySheet({ date });
+    else newBacktestTrade(date);
+  }
   async function logout() {
+    const userId = session?.user?.id;
     await supabase?.auth.signOut();
     ["tradeflow_trades", "tradeflow_balance", "tradeflow_profile", "tradeflow_plan", "tradeflow_cloud_owner"].forEach((key) => localStorage.removeItem(key));
+    if (userId) localStorage.removeItem(`tradeflow_backtest_trades_${userId}`);
     window.location.reload();
   }
   const nav = [
     ["dashboard", "نمای کلی", LayoutDashboard],
     ["calendar", "ژورنال معاملاتی", CalendarDays],
+    ["backtest", "بک‌تست", FlaskConical],
     ["analytics", "تحلیل عملکرد", BarChart3],
     ["playbook", "پلن معاملاتی", BookOpen],
   ];
@@ -957,9 +775,9 @@ function App() {
             <Search />
             <input
               ref={searchRef}
-              placeholder="جستجو در معاملات..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              placeholder={view === "backtest" ? "جستجو در بک‌تست..." : "جستجو در معاملات..."}
+              value={view === "backtest" ? backtestQuery : query}
+              onChange={(e) => view === "backtest" ? setBacktestQuery(e.target.value) : setQuery(e.target.value)}
             />
             <kbd>⌘ K</kbd>
           </div>
@@ -993,9 +811,11 @@ function App() {
             </span>
             <button
               className="primary add-trade-button"
-              aria-label={language === "fa" ? "ثبت معامله" : "Add trade"}
-              title={language === "fa" ? "ثبت معامله" : "Add trade"}
-              onClick={() => newTrade(new Date().toISOString().slice(0, 10))}
+              aria-label={view === "backtest" ? (language === "fa" ? "ثبت معامله بک‌تست" : "Add backtest trade") : (language === "fa" ? "ثبت معامله" : "Add trade")}
+              title={view === "backtest" ? (language === "fa" ? "ثبت معامله بک‌تست" : "Add backtest trade") : (language === "fa" ? "ثبت معامله" : "Add trade")}
+              onClick={() => view === "backtest"
+                ? newBacktestTrade(new Date().toISOString().slice(0, 10))
+                : newTrade(new Date().toISOString().slice(0, 10))}
             >
               <Plus />
             </button>
@@ -1279,6 +1099,20 @@ function App() {
               onTrade={setModal}
             />
           )}
+          {view === "backtest" && (
+            <BacktestPage
+              month={backtestMonth}
+              setMonth={setBacktestMonth}
+              trades={backtestTrades}
+              query={backtestQuery}
+              plan={plan}
+              setPlan={setPlan}
+              language={language}
+              onDay={openBacktestDay}
+              onTrade={setBacktestModal}
+              onAdd={() => newBacktestTrade(new Date().toISOString().slice(0, 10))}
+            />
+          )}
           {view === "analytics" && (
             <AnalyticsPage
               trades={trades}
@@ -1299,6 +1133,7 @@ function App() {
               balance={accountBalance}
               setBalance={setAccountBalance}
               trades={trades}
+              backtestTrades={backtestTrades}
               clearTrades={() => setTrades([])}
               theme={theme}
               setTheme={setTheme}
@@ -1329,6 +1164,19 @@ function App() {
           onClose={() => setModal(null)}
         />
       )}{" "}
+      {backtestModal && (
+        <TradeModal
+          key={backtestModal.id || `new-${backtestModal.date}`}
+          trade={backtestModal}
+          mode="backtest"
+          onSave={saveBacktest}
+          onDelete={backtestModal.id ? () => {
+            setBacktestTrades((current) => current.filter((trade) => trade.id !== backtestModal.id));
+            setBacktestModal(null);
+          } : null}
+          onClose={() => setBacktestModal(null)}
+        />
+      )}
       {riskCalculatorOpen && (
         <RiskCalculatorModal
           balance={currentBalance}
@@ -1349,6 +1197,23 @@ function App() {
           onEdit={(trade) => {
             setDaySheet(null);
             setModal(trade);
+          }}
+        />
+      )}
+      {backtestDaySheet && (
+        <DayTradesModal
+          date={backtestDaySheet.date}
+          mode="backtest"
+          trades={backtestTrades.filter((trade) => trade.date === backtestDaySheet.date)}
+          onClose={() => setBacktestDaySheet(null)}
+          onAdd={() => {
+            const date = backtestDaySheet.date;
+            setBacktestDaySheet(null);
+            newBacktestTrade(date);
+          }}
+          onEdit={(trade) => {
+            setBacktestDaySheet(null);
+            setBacktestModal(trade);
           }}
         />
       )}
@@ -1461,291 +1326,6 @@ function AuthScreen() {
           {mode === "login" ? "حساب نداری؟ ثبت‌نام کن" : "حساب داری؟ وارد شو"}
         </button>
       </form>
-    </div>
-  );
-}
-
-function JournalPage({ month, setMonth, trades, query, onDay, onTrade }) {
-  const visible = trades.filter((t) => {
-    const d = new Date(t.date + "T12:00");
-    const inMonth =
-      d.getMonth() === month.getMonth() &&
-      d.getFullYear() === month.getFullYear();
-    return (
-      inMonth &&
-      (!query ||
-        [t.market, t.setup, t.notes].some((x) =>
-          String(x || "")
-            .toLowerCase()
-            .includes(query.toLowerCase()),
-        ))
-    );
-  });
-  return (
-    <div className="view-page">
-      <PageTitle
-        eyebrow="ژورنال"
-        title="همه معاملات، یک‌جا"
-        text="روزهای معاملاتی را مرور، جستجو و ویرایش کن."
-      />
-      <section className="panel calendar journal-calendar">
-        <div className="cal-head">
-          <PanelHead
-            title="تقویم ماهانه"
-            sub={`${faDigits(visible.length)} معامله در این ماه`}
-          />
-          <MonthNav month={month} setMonth={setMonth} />
-        </div>
-        <Calendar
-          month={month}
-          trades={visible}
-          onDay={onDay}
-          onTrade={onTrade}
-        />
-      </section>
-      <section className="panel journal-table">
-        <PanelHead
-          title="لیست معاملات"
-          sub="برای مشاهده جزئیات روی هر ردیف کلیک کنید"
-        />
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>تاریخ</th>
-                <th>بازار</th>
-                <th>نوع</th>
-                <th>ستاپ</th>
-                <th>ریسک</th>
-                <th>نتیجه</th>
-              </tr>
-            </thead>
-            <tbody>
-              {visible.length ? (
-                [...visible]
-                  .sort((a, b) => b.date.localeCompare(a.date))
-                  .map((t) => (
-                    <tr key={t.id} onClick={() => onTrade(t)}>
-                      <td data-label="تاریخ">{faDigits(t.date)}</td>
-                      <td data-label="بازار" dir="ltr">
-                        {t.market}
-                      </td>
-                      <td data-label="نوع">
-                        <span
-                          className={
-                            t.side === "Long" ? "tag-long" : "tag-short"
-                          }
-                        >
-                          {t.side}
-                        </span>
-                      </td>
-                      <td data-label="ستاپ">{t.setup || "—"}</td>
-                      <td data-label="ریسک">
-                        {money(-Math.abs(Number(t.risk || 0)))}
-                      </td>
-                      <td
-                        data-label="نتیجه"
-                        className={Number(t.pnl) >= 0 ? "green" : "red"}
-                      >
-                        {money(t.pnl)}
-                      </td>
-                    </tr>
-                  ))
-              ) : (
-                <tr>
-                  <td colSpan="6" className="empty-state">
-                    معامله‌ای برای این ماه ثبت نشده است.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function MonthNav({ month, setMonth }) {
-  return (
-    <div className="month-nav">
-      <button
-        onClick={() =>
-          setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
-        }
-      >
-        <ChevronRight />
-      </button>
-      <b>
-        {monthNames[month.getMonth()]} {faDigits(month.getFullYear())}
-      </b>
-      <button
-        onClick={() =>
-          setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
-        }
-      >
-        <ChevronLeft />
-      </button>
-    </div>
-  );
-}
-
-function AnalyticsPage({ trades, equity, winrate, total, profitFactor, accountBalance }) {
-  const byMarket = Object.values(
-    trades.reduce((a, t) => {
-      a[t.market] ||= { name: t.market, pnl: 0, count: 0 };
-      a[t.market].pnl += Number(t.pnl);
-      a[t.market].count++;
-      return a;
-    }, {}),
-  ).sort((a, b) => b.pnl - a.pnl);
-  const bySetup = Object.values(
-    trades.reduce((a, t) => {
-      const k = t.setup || "بدون ستاپ";
-      a[k] ||= { name: k, pnl: 0, count: 0 };
-      a[k].pnl += Number(t.pnl);
-      a[k].count++;
-      return a;
-    }, {}),
-  ).sort((a, b) => b.pnl - a.pnl);
-  const max = Math.max(1, ...byMarket.map((x) => Math.abs(x.pnl)));
-  const long = trades.filter((t) => t.side === "Long"),
-    short = trades.filter((t) => t.side === "Short");
-  const sum = (x) => x.reduce((s, t) => s + Number(t.pnl), 0);
-  const averageWin = trades.filter((trade) => Number(trade.pnl) > 0);
-  const averageLoss = trades.filter((trade) => Number(trade.pnl) < 0);
-  const avgWin = averageWin.length ? sum(averageWin) / averageWin.length : 0;
-  const avgLoss = averageLoss.length ? Math.abs(sum(averageLoss) / averageLoss.length) : 0;
-  const payoffRatio = avgLoss ? avgWin / avgLoss : 0;
-  const expectancy = trades.length ? sum(trades) / trades.length : 0;
-  const maxDrawdown = getMaxDrawdown(equity);
-  const recoveryFactor = maxDrawdown ? Math.max(0, total) / maxDrawdown : 0;
-  const returnPercent = accountBalance ? (sum(trades) / accountBalance) * 100 : 0;
-  return (
-    <div className="view-page">
-      <PageTitle
-        eyebrow="تحلیل عملکرد"
-        title="اعداد، داستان معاملاتت را می‌گویند"
-        text="تمام گزارش‌ها مستقیماً از معاملات ثبت‌شده محاسبه شده‌اند."
-      />
-      <section className="stats analytic-stats">
-        <Stat
-          icon={TrendingUp}
-          label="سود خالص ماه"
-          value={money(total)}
-          detail="خالص نتایج"
-        />
-        <Stat
-          icon={Target}
-          label="نرخ برد"
-          value={faDigits(winrate) + "٪"}
-          detail="در ماه انتخابی"
-        />
-        <Stat
-          icon={BarChart3}
-          label="Profit Factor"
-          value={profitFactor.toFixed(2)}
-          detail="سود ناخالص ÷ زیان ناخالص"
-        />
-        <Stat
-          icon={Clock3}
-          label="کل معاملات"
-          value={faDigits(trades.length)}
-          detail="تمام دوره"
-        />
-      </section>
-      <section className="pro-metrics">
-        <div><span><BrainCircuit /> امید ریاضی</span><b className={expectancy >= 0 ? "green" : "red"}>{money(expectancy)}</b><small>میانگین خروجی هر معامله</small></div>
-        <div><span><Award /> Payoff ratio</span><b>{payoffRatio.toFixed(2)}</b><small>میانگین برد ÷ میانگین باخت</small></div>
-        <div><span><ShieldCheck /> Recovery factor</span><b>{recoveryFactor.toFixed(2)}</b><small>توان جبران افت سرمایه</small></div>
-        <div><span><Activity /> بازده کل</span><b className={returnPercent >= 0 ? "green" : "red"}>{returnPercent.toFixed(2)}%</b><small>نسبت به سرمایه اولیه</small></div>
-      </section>
-      <section className="grid-top">
-        <div className="panel">
-          <PanelHead title="منحنی موجودی" sub="روند عملکرد حساب" />
-          <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={equity}>
-              <CartesianGrid stroke="#EBEDEF" vertical={false} />
-              <XAxis dataKey="name" stroke="#89909A" />
-              <YAxis stroke="#89909A" />
-              <Tooltip
-                contentStyle={{
-                  background: "#FFFFFF",
-                  color: "#171D26",
-                  border: "1px solid #D7DADF",
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="value"
-                stroke="#007AFF"
-                fill="#007AFF20"
-                strokeWidth={3}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="panel">
-          <PanelHead title="جهت معاملات" sub="عملکرد خرید و فروش" />
-          <div className="direction-cards">
-            <div>
-              <span>Long</span>
-              <b className={sum(long) >= 0 ? "green" : "red"}>
-                {money(sum(long))}
-              </b>
-              <small>{faDigits(long.length)} معامله</small>
-            </div>
-            <div>
-              <span>Short</span>
-              <b className={sum(short) >= 0 ? "green" : "red"}>
-                {money(sum(short))}
-              </b>
-              <small>{faDigits(short.length)} معامله</small>
-            </div>
-          </div>
-        </div>
-      </section>
-      <section className="analytics-grid">
-        <div className="panel">
-          <PanelHead title="عملکرد بازارها" sub="سود و زیان به تفکیک نماد" />
-          <div className="bar-list">
-            {byMarket.map((x) => (
-              <div key={x.name}>
-                <span dir="ltr">{x.name}</span>
-                <div>
-                  <i
-                    className={x.pnl >= 0 ? "pos" : "neg"}
-                    style={{
-                      width: `${Math.max(5, (Math.abs(x.pnl) / max) * 100)}%`,
-                    }}
-                  />
-                </div>
-                <b className={x.pnl >= 0 ? "green" : "red"}>{money(x.pnl)}</b>
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="panel">
-          <PanelHead
-            title="بهترین ستاپ‌ها"
-            sub="رتبه‌بندی استراتژی‌های ثبت‌شده"
-          />
-          <div className="rank-list">
-            {bySetup.map((x, i) => (
-              <div key={x.name}>
-                <em>{faDigits(i + 1)}</em>
-                <span>
-                  <b>{x.name}</b>
-                  <small>{faDigits(x.count)} معامله</small>
-                </span>
-                <strong className={x.pnl >= 0 ? "green" : "red"}>
-                  {money(x.pnl)}
-                </strong>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }
@@ -1880,6 +1460,7 @@ function SettingsPage({
   balance,
   setBalance,
   trades,
+  backtestTrades,
   clearTrades,
   theme,
   setTheme,
@@ -1894,7 +1475,7 @@ function SettingsPage({
 }) {
   const exportData = () => {
     const blob = new Blob(
-      [JSON.stringify({ profile, balance, plan, trades }, null, 2)],
+      [JSON.stringify({ profile, balance, plan, trades, backtestTrades }, null, 2)],
       { type: "application/json" },
     );
     const a = document.createElement("a");
@@ -2020,7 +1601,7 @@ function SettingsPage({
         <div className="panel data-box">
           <PanelHead
             title="مدیریت داده‌ها"
-            sub={`${faDigits(trades.length)} معامله ذخیره‌شده`}
+            sub={`${faDigits(trades.length)} معامله لایو · ${faDigits(backtestTrades.length)} معامله بک‌تست`}
           />
           <button onClick={exportData}>
             دریافت نسخه پشتیبان JSON <ChevronLeft />
@@ -2031,17 +1612,17 @@ function SettingsPage({
             {session && <button type="button" onClick={onLogout}><LogOut /> خروج از حساب</button>}
           </div>
           <div className="danger-zone">
-            <b>پاک‌کردن معاملات</b>
+            <b>پاک‌کردن معاملات لایو</b>
             <p>
-              این کار تمام معاملات ثبت‌شده را حذف می‌کند و قابل بازگشت نیست.
+              فقط معاملات ژورنال لایو حذف می‌شوند؛ داده‌های بک‌تست دست‌نخورده می‌مانند. این کار قابل بازگشت نیست.
             </p>
             <button
               onClick={() =>
-                window.confirm("همه معاملات حذف شوند؟") && clearTrades()
+                window.confirm("همه معاملات لایو حذف شوند؟ معاملات بک‌تست باقی می‌مانند.") && clearTrades()
               }
             >
               <Trash2 />
-              حذف همه معاملات
+              حذف معاملات لایو
             </button>
           </div>
         </div>
@@ -2257,7 +1838,7 @@ function Ring({ value }) {
     </div>
   );
 }
-function DayTradesModal({ date, trades, onClose, onAdd, onEdit }) {
+function DayTradesModal({ date, trades, onClose, onAdd, onEdit, mode = "live" }) {
   const total = trades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
   return (
     <div
@@ -2267,7 +1848,7 @@ function DayTradesModal({ date, trades, onClose, onAdd, onEdit }) {
       <div className="modal day-trades-modal">
         <div className="modal-head">
           <div>
-            <span>معاملات روز</span>
+            <span>{mode === "backtest" ? "معاملات بک‌تست روز" : "معاملات روز"}</span>
             <h2>{faDigits(date)}</h2>
             <p>
               {faDigits(trades.length)} معامله · نتیجه کل {money(total)}
@@ -2456,7 +2037,7 @@ function RiskCalculatorModal({ balance, defaultRisk, onClose }) {
   );
 }
 
-function TradeModal({ trade, onSave, onDelete, onClose }) {
+function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
   const [f, setF] = useState(trade);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
@@ -2490,9 +2071,9 @@ function TradeModal({ trade, onSave, onDelete, onClose }) {
       >
         <div className="modal-head">
           <div>
-            <span>ثبت در ژورنال</span>
-            <h2>{trade.id ? "ویرایش معامله" : "معامله جدید"}</h2>
-            <p>{faDigits(f.date)} · اطلاعات معامله را دقیق وارد کنید</p>
+            <span>{mode === "backtest" ? "ثبت در بک‌تست" : "ثبت در ژورنال"}</span>
+            <h2>{trade.id ? "ویرایش معامله" : mode === "backtest" ? "معامله بک‌تست جدید" : "معامله جدید"}</h2>
+            <p>{faDigits(f.date)} · {mode === "backtest" ? "بدون تأثیر بر حساب لایو" : "اطلاعات معامله را دقیق وارد کنید"}</p>
           </div>
           <button type="button" onClick={onClose}>
             <X />
@@ -2526,6 +2107,10 @@ function TradeModal({ trade, onSave, onDelete, onClose }) {
           </div>
           {imageError && <p className="image-error">{imageError}</p>}
           <div className="form-grid">
+            {mode === "backtest" && <label>
+              تاریخ معامله
+              <input type="date" required value={f.date} onChange={(e) => put("date", e.target.value)} />
+            </label>}
             <label>
               بازار
               <input
