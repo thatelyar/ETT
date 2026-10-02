@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Activity, Award, BarChart3, BookOpen, BrainCircuit, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, Download, FlaskConical, Plus, ShieldCheck, Target, TrendingUp } from "lucide-react";
+import { Activity, Award, BarChart3, BookOpen, BrainCircuit, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, Download, FlaskConical, Plus, ShieldCheck, Target, TrendingUp, Upload } from "lucide-react";
+import { createBacktestBackup } from "./backtestBackup.mjs";
 
 export function createJournalViews({ faDigits, money, monthNames, getMaxDrawdown, PageTitle, PanelHead, Calendar, Stat }) {
-function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language, onDay, onTrade, onAdd }) {
+function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language, onDay, onTrade, onAdd, onImport, importBusy, importStatus, cloudConnected }) {
   const [tab, setTab] = useState("journal");
   const balance = Number(plan.backtestBalance || 0);
   const total = trades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
@@ -20,12 +21,12 @@ function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language,
       .map((trade) => ({ name: faDigits(trade.date.slice(5)), value: (value += Number(trade.pnl || 0)) }))];
   }, [trades, balance]);
   const downloadBackup = () => {
-    const blob = new Blob([JSON.stringify({ type: "backtest", balance, trades }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(createBacktestBackup(trades, balance))], { type: "application/json" });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "ett-backtest-backup.json";
+    link.download = `ETT-backtest-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
-    URL.revokeObjectURL(link.href);
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
   };
   return (
     <div className="backtest-workspace">
@@ -37,10 +38,21 @@ function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language,
       <div className="backtest-toolbar">
         <div className="backtest-mode-pill"><FlaskConical /> {language === "fa" ? "فقط معاملات بک‌تست" : "Backtest trades only"}</div>
         <div className="backtest-toolbar-actions">
-          <button type="button" className="backtest-backup" onClick={downloadBackup}><Download /> {language === "fa" ? "نسخه پشتیبان بک‌تست" : "Backtest backup"}</button>
+          <button type="button" className="backtest-backup" onClick={downloadBackup}><Download /> {language === "fa" ? "دانلود بک‌تست و عکس‌ها" : "Download trades & photos"}</button>
+          <label className={`backtest-backup backtest-import ${importBusy ? "busy" : ""}`}><Upload /> {importBusy ? (language === "fa" ? "در حال بازیابی..." : "Restoring...") : (language === "fa" ? "آپلود و بازیابی" : "Upload & restore")}
+            <input type="file" accept=".json,application/json" disabled={importBusy} onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onImport(file);
+              event.target.value = "";
+            }} />
+          </label>
           <button type="button" className="primary backtest-add" onClick={onAdd}><Plus /> {language === "fa" ? "ثبت معامله بک‌تست" : "Add backtest trade"}</button>
         </div>
       </div>
+      <p className="backtest-transfer-hint">{language === "fa"
+        ? `فایل دانلودی همهٔ مشخصات و عکس‌های هر معامله را دارد. بعداً همین فایل را اینجا آپلود کن تا بدون دست‌زدن به معاملات لایو بازیابی شود.${cloudConnected ? " اکنون بازیابی در پایگاه‌داده هم ذخیره می‌شود." : " تا زمان اتصال پایگاه‌داده، فایل را نزد خودت نگه دار."}`
+        : `The download includes every trade and photo. Upload it here later to restore your backtest without affecting live trades.${cloudConnected ? " Restored trades are saved to the database." : " Keep the file until the database is connected."}`}</p>
+      {importStatus && <p className={`backtest-import-status ${importStatus.type}`} role="status">{importStatus.message}</p>}
       <section className="backtest-summary-grid">
         <div className="backtest-summary-card"><span><BookOpen /> {language === "fa" ? "معاملات ثبت‌شده" : "Recorded trades"}</span><b>{faDigits(trades.length)}</b><small>{language === "fa" ? "فقط در فضای بک‌تست" : "Backtest only"}</small></div>
         <div className="backtest-summary-card"><span><Target /> {language === "fa" ? "نرخ برد" : "Win rate"}</span><b>{faDigits(winrate)}٪</b><small>{language === "fa" ? "کل معاملات آزمایشی" : "All simulated trades"}</small></div>

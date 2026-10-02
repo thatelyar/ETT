@@ -54,6 +54,7 @@ import {
   X,
 } from "lucide-react";
 import {
+  addCloudBacktestTrades,
   cloudEnabled,
   loadCloudData,
   saveCloudSettings,
@@ -70,6 +71,7 @@ import {
 } from "./sessionGate.mjs";
 import { nextBacktestTradeId } from "./tradeJournal.mjs";
 import { backtestImages, tradePreviewImage } from "./backtestImages.mjs";
+import { mergeBacktestBackup, parseBacktestBackup } from "./backtestBackup.mjs";
 import { translateUI } from "./translation.mjs";
 import { createJournalViews } from "./journalViews.jsx";
 import "./styles.css";
@@ -304,6 +306,10 @@ function App() {
     }
   });
   const [backtestStorageError, setBacktestStorageError] = useState(false);
+  const [backtestImportBusy, setBacktestImportBusy] = useState(false);
+  const [backtestImportStatus, setBacktestImportStatus] = useState(null);
+  const cloudSavePromise = useRef(Promise.resolve());
+  const backtestImportInProgress = useRef(false);
   const [accountBalance, setAccountBalance] = useState(() =>
     Number(localStorage.getItem("tradeflow_balance") || 0),
   );
@@ -498,10 +504,11 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
   useEffect(() => {
-    if (!cloudEnabled || !cloudReady || !session?.user?.id) return;
+    if (!cloudEnabled || !cloudReady || !session?.user?.id || backtestImportBusy) return;
     setCloudState("saving");
     const timer = window.setTimeout(() => {
-      Promise.all([
+      if (backtestImportInProgress.current) return;
+      cloudSavePromise.current = Promise.all([
         saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan }),
         saveCloudTrades(session.user.id, trades),
         saveCloudTrades(session.user.id, backtestTrades, "backtest"),
@@ -513,7 +520,7 @@ function App() {
         });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [trades, backtestTrades, accountBalance, profile, plan, cloudReady, session?.user?.id]);
+  }, [trades, backtestTrades, accountBalance, profile, plan, cloudReady, session?.user?.id, backtestImportBusy]);
   useLayoutEffect(() => {
     if (language === "en") translateUI(appRef.current);
   }, [
@@ -650,6 +657,47 @@ function App() {
     const date = new Date(`${data.date}T12:00:00`);
     if (!Number.isNaN(date.getTime())) setBacktestMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     setBacktestModal(null);
+  }
+  async function importBacktestFile(file) {
+    if (backtestImportBusy) return;
+    backtestImportInProgress.current = true;
+    setBacktestImportBusy(true);
+    setBacktestImportStatus(null);
+    try {
+      const { balance, trades: imported } = parseBacktestBackup(await file.text());
+      if (cloudEnabled) await cloudSavePromise.current;
+      const { trades: merged, added, skipped } = mergeBacktestBackup(backtestTrades, imported);
+      const restoreBalance = backtestTrades.length === 0;
+      if (cloudEnabled) {
+        if (!cloudReady || !session?.user?.id) throw new Error("اتصال پایگاه‌داده هنوز آماده نیست؛ فایل را نگه دار و دوباره تلاش کن.");
+        if (restoreBalance) await saveCloudSettings(session.user.id, {
+          profile, balance: accountBalance, plan: { ...plan, backtestBalance: balance },
+        });
+        await addCloudBacktestTrades(session.user.id, added);
+      } else {
+        try {
+          localStorage.setItem("tradeflow_backtest_trades", JSON.stringify(merged));
+          setBacktestStorageError(false);
+        } catch (error) {
+          console.warn("Imported backtest exceeds local browser storage", error);
+          setBacktestStorageError(true);
+          setBacktestImportStatus({ type: "warning", message: "معاملات فعلاً در این صفحه دیده می‌شوند، اما فضای مرورگر برای ذخیره کافی نیست. فایل بک‌تست را نگه دار و قبل از بستن صفحه دوباره دانلود کن." });
+        }
+      }
+      setBacktestTrades(merged);
+      if (restoreBalance) setPlan((current) => ({ ...current, backtestBalance: balance }));
+      setBacktestMonth(new Date(`${(added[0] || imported[0])?.date || new Date().toISOString().slice(0, 10)}T12:00:00`));
+      setBacktestImportStatus((current) => current?.type === "warning" ? current : {
+        type: "success",
+        message: `${faDigits(added.length)} معامله با همهٔ عکس‌ها بازیابی شد${skipped ? `؛ ${faDigits(skipped)} معاملهٔ تکراری رد شد` : ""}.${cloudEnabled ? " در پایگاه‌داده ذخیره شد." : " فایل را برای انتقال بعدی نگه دار."}`,
+      });
+    } catch (error) {
+      console.error(error);
+      setBacktestImportStatus({ type: "error", message: error.message || "بازیابی بک‌تست ناموفق بود؛ فایل اصلی تغییر نکرده است." });
+    } finally {
+      backtestImportInProgress.current = false;
+      setBacktestImportBusy(false);
+    }
   }
   function newBacktestTrade(date) {
     setBacktestModal({
@@ -1120,6 +1168,10 @@ function App() {
                 onDay={openBacktestDay}
                 onTrade={setBacktestModal}
                 onAdd={() => newBacktestTrade(new Date().toISOString().slice(0, 10))}
+                onImport={importBacktestFile}
+                importBusy={backtestImportBusy}
+                importStatus={backtestImportStatus}
+                cloudConnected={cloudEnabled && cloudReady && cloudState !== "error"}
               />
             </>
           )}

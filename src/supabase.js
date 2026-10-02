@@ -63,22 +63,7 @@ export async function saveCloudTrades(userId, trades, journal = "live") {
     throw new Error(`A ${journal} save included a trade from another journal`);
   }
   const inJournal = (query) => journal === "backtest" ? query.lt("id", 0) : query.gte("id", 0);
-  const rows = trades.map((trade) => ({
-    id: Number(trade.id),
-    user_id: userId,
-    trade_date: trade.date,
-    market: trade.market,
-    side: trade.side,
-    entry: trade.entry === "" ? null : Number(trade.entry),
-    exit: trade.exit === "" ? null : Number(trade.exit),
-    pnl: Number(trade.pnl || 0),
-    risk: trade.risk === "" ? null : Number(trade.risk),
-    setup: trade.setup || "",
-    emotion: trade.emotion || "",
-    notes: trade.notes || "",
-    image: journal === "backtest" ? encodeBacktestImages(trade) : trade.image || "",
-    updated_at: new Date().toISOString(),
-  }));
+  const rows = trades.map((trade) => tradeRow(userId, trade, journal));
   const { data: existing, error: readError } = await inJournal(supabase
     .from("trades")
     .select("id")
@@ -94,4 +79,34 @@ export async function saveCloudTrades(userId, trades, journal = "live") {
     const { error } = await supabase.from("trades").upsert(rows);
     if (error) throw error;
   }
+}
+
+function tradeRow(userId, trade, journal) {
+  return {
+    id: Number(trade.id),
+    user_id: userId,
+    trade_date: trade.date,
+    market: trade.market,
+    side: trade.side,
+    entry: trade.entry === "" ? null : Number(trade.entry),
+    exit: trade.exit === "" ? null : Number(trade.exit),
+    pnl: Number(trade.pnl || 0),
+    risk: trade.risk === "" ? null : Number(trade.risk),
+    setup: trade.setup || "",
+    emotion: trade.emotion || "",
+    notes: trade.notes || "",
+    image: journal === "backtest" ? encodeBacktestImages(trade) : trade.image || "",
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// Import adds only the new backtest rows. It never removes existing cloud rows
+// and never touches the live journal.
+export async function addCloudBacktestTrades(userId, trades) {
+  if (!trades.every((trade) => tradeBelongsToJournal(trade, "backtest"))) {
+    throw new Error("Backtest import included a live trade");
+  }
+  if (!trades.length) return;
+  const { error } = await supabase.from("trades").upsert(trades.map((trade) => tradeRow(userId, trade, "backtest")));
+  if (error) throw error;
 }
