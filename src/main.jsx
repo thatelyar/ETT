@@ -69,6 +69,7 @@ import {
   sessionRuleSignature,
 } from "./sessionGate.mjs";
 import { nextBacktestTradeId } from "./tradeJournal.mjs";
+import { backtestImages, tradePreviewImage } from "./backtestImages.mjs";
 import { translateUI } from "./translation.mjs";
 import { createJournalViews } from "./journalViews.jsx";
 import "./styles.css";
@@ -144,17 +145,16 @@ function loadImage(url) {
   });
 }
 
-async function prepareTradeImage(file) {
+async function prepareTradeImage(file, { maxSide = 1600, quality = 0.78 } = {}) {
   const objectUrl = URL.createObjectURL(file);
   try {
     const image = await loadImage(objectUrl);
-    const maxSide = 1600;
     const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
     canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
     canvas.getContext("2d").drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.78));
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
     if (!blob) throw new Error("Image conversion failed");
     return await fileToDataUrl(blob);
   } finally {
@@ -303,6 +303,7 @@ function App() {
       return [];
     }
   });
+  const [backtestStorageError, setBacktestStorageError] = useState(false);
   const [accountBalance, setAccountBalance] = useState(() =>
     Number(localStorage.getItem("tradeflow_balance") || 0),
   );
@@ -377,14 +378,17 @@ function App() {
     const key = cloudEnabled ? `tradeflow_backtest_trades_${session.user.id}` : "tradeflow_backtest_trades";
     try {
       localStorage.setItem(key, JSON.stringify(backtestTrades));
+      setBacktestStorageError(false);
     } catch (error) {
       console.warn("Local backtest cache exceeded its quota", error);
       if (cloudEnabled) {
         try {
-          localStorage.setItem(key, JSON.stringify(backtestTrades.map((trade) => ({ ...trade, image: "" }))));
+          localStorage.setItem(key, JSON.stringify(backtestTrades.map((trade) => ({ ...trade, image: "", images: [] }))));
         } catch (fallbackError) {
           console.warn("Unable to update the local backtest cache", fallbackError);
         }
+      } else {
+        setBacktestStorageError(true);
       }
     }
   }, [backtestTrades, cloudReady, session?.user?.id]);
@@ -639,9 +643,10 @@ function App() {
     else newTrade(date);
   }
   function saveBacktest(data) {
+    const withImages = { ...data, images: backtestImages(data), image: "" };
     setBacktestTrades((current) => data.id
-      ? current.map((trade) => trade.id === data.id ? data : trade)
-      : [...current, { ...data, id: nextBacktestTradeId(current) }]);
+      ? current.map((trade) => trade.id === data.id ? withImages : trade)
+      : [...current, { ...withImages, id: nextBacktestTradeId(current) }]);
     const date = new Date(`${data.date}T12:00:00`);
     if (!Number.isNaN(date.getTime())) setBacktestMonth(new Date(date.getFullYear(), date.getMonth(), 1));
     setBacktestModal(null);
@@ -659,6 +664,7 @@ function App() {
       emotion: "متمرکز",
       notes: "",
       image: "",
+      images: [],
     });
   }
   function openBacktestDay(date, dayTrades = []) {
@@ -1100,18 +1106,22 @@ function App() {
             />
           )}
           {view === "backtest" && (
-            <BacktestPage
-              month={backtestMonth}
-              setMonth={setBacktestMonth}
-              trades={backtestTrades}
-              query={backtestQuery}
-              plan={plan}
-              setPlan={setPlan}
-              language={language}
-              onDay={openBacktestDay}
-              onTrade={setBacktestModal}
-              onAdd={() => newBacktestTrade(new Date().toISOString().slice(0, 10))}
-            />
+            <>
+              {backtestStorageError && <p className="backtest-storage-alert" role="alert">فضای ذخیره‌سازی مرورگر پر شده است. قبل از بستن صفحه، از بک‌تست نسخهٔ پشتیبان بگیر و حجم عکس‌ها را کمتر کن.</p>}
+              {cloudState === "error" && <p className="backtest-storage-alert" role="alert">همگام‌سازی ابری با خطا روبه‌رو شد. تا برطرف‌شدن مشکل این صفحه را نبند.</p>}
+              <BacktestPage
+                month={backtestMonth}
+                setMonth={setBacktestMonth}
+                trades={backtestTrades}
+                query={backtestQuery}
+                plan={plan}
+                setPlan={setPlan}
+                language={language}
+                onDay={openBacktestDay}
+                onTrade={setBacktestModal}
+                onAdd={() => newBacktestTrade(new Date().toISOString().slice(0, 10))}
+              />
+            </>
           )}
           {view === "analytics" && (
             <AnalyticsPage
@@ -1920,7 +1930,8 @@ function Calendar({ month, trades, onDay }) {
           if (!d) return <div className="day blank" key={i} />;
           const ds = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
             ts = trades.filter((t) => t.date === ds),
-            p = ts.reduce((s, t) => s + Number(t.pnl || 0), 0);
+            p = ts.reduce((s, t) => s + Number(t.pnl || 0), 0),
+            previewImage = tradePreviewImage(ts[0]);
           return (
             <button
               key={ds}
@@ -1933,14 +1944,14 @@ function Calendar({ month, trades, onDay }) {
                       ? "loss"
                       : "flat"
                   : "") +
-                (ts[0]?.image ? " has-image" : "")
+                (previewImage ? " has-image" : "")
               }
               onClick={() => onDay(ds, ts)}
             >
-              {ts[0]?.image && (
+              {previewImage && (
                 <img
                   className="day-image"
-                  src={ts[0].image}
+                  src={previewImage}
                   alt="چارت معامله"
                 />
               )}
@@ -2038,20 +2049,31 @@ function RiskCalculatorModal({ balance, defaultRisk, onClose }) {
 }
 
 function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
-  const [f, setF] = useState(trade);
+  const [f, setF] = useState(() => mode === "backtest"
+    ? { ...trade, images: backtestImages(trade), image: "" }
+    : trade);
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
   const put = (k, v) => setF((x) => ({ ...x, [k]: v }));
   async function image(e) {
-    const file = e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
     setImageBusy(true);
     setImageError("");
     try {
-      put("image", await prepareTradeImage(file));
+      if (mode === "backtest") {
+        const images = await Promise.all(files.map(async (file, index) => ({
+          id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+          timeframe: "",
+          src: await prepareTradeImage(file, { maxSide: 1280, quality: 0.72 }),
+        })));
+        setF((current) => ({ ...current, images: [...backtestImages(current), ...images], image: "" }));
+      } else {
+        put("image", await prepareTradeImage(files[0]));
+      }
     } catch (error) {
       console.error(error);
-      setImageError("این تصویر قابل پردازش نیست؛ لطفاً یک تصویر JPG یا PNG انتخاب کنید.");
+      setImageError("یکی از تصاویر قابل پردازش نیست؛ لطفاً فایل JPG، PNG یا WebP انتخاب کنید.");
     } finally {
       setImageBusy(false);
       e.target.value = "";
@@ -2080,7 +2102,48 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
           </button>
         </div>
         <div className="modal-body">
-          <div className="wide upload-wrap">
+          {mode === "backtest" ? (
+            <section className="backtest-images">
+              <div className="backtest-images-head">
+                <div><b>تصاویر تایم‌فریم‌ها</b><small>برای این پوزیشن هر تعداد چارت اضافه کن و تایم‌فریم هر عکس را بنویس.</small></div>
+                <span>{faDigits(backtestImages(f).length)} عکس</span>
+              </div>
+              <div className="backtest-images-grid">
+                {backtestImages(f).map((item, index) => (
+                  <div className="backtest-image-card" key={item.id || `${index}-${item.src.slice(0, 30)}`}>
+                    <img src={item.src} alt={`چارت ${item.timeframe || index + 1}`} />
+                    <label>تایم‌فریم
+                      <input
+                        list="backtest-timeframe-options"
+                        value={item.timeframe || ""}
+                        onChange={(event) => setF((current) => ({
+                          ...current,
+                          images: backtestImages(current).map((image, imageIndex) => imageIndex === index
+                            ? { ...image, timeframe: event.target.value }
+                            : image),
+                        }))}
+                        placeholder="مثلاً 4H یا 15M"
+                      />
+                    </label>
+                    <div className="backtest-image-actions">
+                      <a href={item.src} download={`ETT-backtest-${f.date}-${item.timeframe || index + 1}.jpg`} title="دانلود عکس" aria-label="دانلود عکس"><Download /></a>
+                      <button type="button" onClick={() => setF((current) => ({ ...current, images: backtestImages(current).filter((_, imageIndex) => imageIndex !== index) }))} title="حذف عکس" aria-label="حذف عکس"><Trash2 /></button>
+                    </div>
+                  </div>
+                ))}
+                <label className="backtest-image-add">
+                  <ImagePlus />
+                  <b>{imageBusy ? "در حال آماده‌سازی…" : "افزودن عکس"}</b>
+                  <small>می‌توانی چند عکس را هم‌زمان انتخاب کنی</small>
+                  <input type="file" multiple accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={image} disabled={imageBusy} />
+                </label>
+              </div>
+              <datalist id="backtest-timeframe-options">
+                <option value="1D" /><option value="4H" /><option value="1H" />
+                <option value="30M" /><option value="15M" /><option value="5M" /><option value="1M" />
+              </datalist>
+            </section>
+          ) : <div className="wide upload-wrap">
             <label className="upload">
               {f.image ? (
                 <img src={f.image} alt="اسکرین‌شات چارت معامله" />
@@ -2104,7 +2167,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
                 <span>دانلود عکس</span>
               </a>
             )}
-          </div>
+          </div>}
           {imageError && <p className="image-error">{imageError}</p>}
           <div className="form-grid">
             {mode === "backtest" && <label>

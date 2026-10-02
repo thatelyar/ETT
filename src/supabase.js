@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { partitionJournalTrades, tradeBelongsToJournal } from "./tradeJournal.mjs";
+import { backtestImages, encodeBacktestImages } from "./backtestImages.mjs";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -33,7 +34,16 @@ export async function loadCloudData(userId) {
       notes: trade.notes || "",
       image: trade.image || "",
     }));
-  return { settings, ...partitionJournalTrades(mappedTrades) };
+  const journals = partitionJournalTrades(mappedTrades);
+  return {
+    settings,
+    trades: journals.trades,
+    backtestTrades: journals.backtestTrades.map((trade) => ({
+      ...trade,
+      images: backtestImages(trade),
+      image: "",
+    })),
+  };
 }
 
 export async function saveCloudSettings(userId, { profile, balance, plan }) {
@@ -66,7 +76,7 @@ export async function saveCloudTrades(userId, trades, journal = "live") {
     setup: trade.setup || "",
     emotion: trade.emotion || "",
     notes: trade.notes || "",
-    image: trade.image || "",
+    image: journal === "backtest" ? encodeBacktestImages(trade) : trade.image || "",
     updated_at: new Date().toISOString(),
   }));
   const { data: existing, error: readError } = await inJournal(supabase
