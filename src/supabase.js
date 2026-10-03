@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { partitionJournalTrades, tradeBelongsToJournal } from "./tradeJournal.mjs";
-import { backtestImages, encodeBacktestImages } from "./backtestImages.mjs";
+import { backtestImages, backtestMetadata, encodeBacktestImages } from "./backtestImages.mjs";
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -35,25 +35,24 @@ export async function loadCloudData(userId) {
       image: trade.image || "",
     }));
   const journals = partitionJournalTrades(mappedTrades);
+  const withImagesAndStatus = (trade) => ({ ...trade, ...backtestMetadata(trade), images: backtestImages(trade), image: "" });
   return {
     settings,
-    trades: journals.trades,
-    backtestTrades: journals.backtestTrades.map((trade) => ({
-      ...trade,
-      images: backtestImages(trade),
-      image: "",
-    })),
+    trades: journals.trades.map(withImagesAndStatus),
+    backtestTrades: journals.backtestTrades.map(withImagesAndStatus),
   };
 }
 
-export async function saveCloudSettings(userId, { profile, balance, plan }) {
-  const { error } = await supabase.from("user_settings").upsert({
+export async function saveCloudSettings(userId, { profile, balance, plan }, signal) {
+  let query = supabase.from("user_settings").upsert({
     user_id: userId,
     profile,
     balance,
     plan,
     updated_at: new Date().toISOString(),
   });
+  if (signal) query = query.abortSignal(signal);
+  const { error } = await query;
   if (error) throw error;
 }
 
@@ -95,18 +94,20 @@ function tradeRow(userId, trade, journal) {
     setup: trade.setup || "",
     emotion: trade.emotion || "",
     notes: trade.notes || "",
-    image: journal === "backtest" ? encodeBacktestImages(trade) : trade.image || "",
+    image: encodeBacktestImages(trade),
     updated_at: new Date().toISOString(),
   };
 }
 
 // Import adds only the new backtest rows. It never removes existing cloud rows
 // and never touches the live journal.
-export async function addCloudBacktestTrades(userId, trades) {
+export async function addCloudBacktestTrades(userId, trades, signal) {
   if (!trades.every((trade) => tradeBelongsToJournal(trade, "backtest"))) {
     throw new Error("Backtest import included a live trade");
   }
   if (!trades.length) return;
-  const { error } = await supabase.from("trades").upsert(trades.map((trade) => tradeRow(userId, trade, "backtest")));
+  let query = supabase.from("trades").upsert(trades.map((trade) => tradeRow(userId, trade, "backtest")));
+  if (signal) query = query.abortSignal(signal);
+  const { error } = await query;
   if (error) throw error;
 }

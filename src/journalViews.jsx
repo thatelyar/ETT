@@ -2,24 +2,27 @@ import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Activity, Award, BarChart3, BookOpen, BrainCircuit, CalendarDays, ChevronLeft, ChevronRight, CircleDollarSign, Clock3, Download, FlaskConical, Plus, ShieldCheck, Target, TrendingUp, Upload } from "lucide-react";
 import { createBacktestBackup } from "./backtestBackup.mjs";
+import { executedTrades, isNoEntry } from "./backtestEntries.mjs";
 
 export function createJournalViews({ faDigits, money, monthNames, getMaxDrawdown, PageTitle, PanelHead, Calendar, Stat }) {
 function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language, onDay, onTrade, onAdd, onImport, importBusy, importStatus, cloudConnected }) {
   const [tab, setTab] = useState("journal");
   const balance = Number(plan.backtestBalance || 0);
-  const total = trades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
-  const winners = trades.filter((trade) => Number(trade.pnl) > 0);
-  const losers = trades.filter((trade) => Number(trade.pnl) < 0);
-  const winrate = trades.length ? Math.round(winners.length / trades.length * 100) : 0;
+  const executed = useMemo(() => executedTrades(trades), [trades]);
+  const noEntryCount = trades.length - executed.length;
+  const total = executed.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+  const winners = executed.filter((trade) => Number(trade.pnl) > 0);
+  const losers = executed.filter((trade) => Number(trade.pnl) < 0);
+  const winrate = executed.length ? Math.round(winners.length / executed.length * 100) : 0;
   const grossProfit = winners.reduce((sum, trade) => sum + Number(trade.pnl), 0);
   const grossLoss = Math.abs(losers.reduce((sum, trade) => sum + Number(trade.pnl), 0));
   const profitFactor = grossLoss ? grossProfit / grossLoss : grossProfit || 0;
   const equity = useMemo(() => {
     let value = balance;
-    return [{ name: "شروع", value }, ...[...trades]
+    return [{ name: "شروع", value }, ...[...executed]
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((trade) => ({ name: faDigits(trade.date.slice(5)), value: (value += Number(trade.pnl || 0)) }))];
-  }, [trades, balance]);
+  }, [executed, balance]);
   const downloadBackup = () => {
     const blob = new Blob([JSON.stringify(createBacktestBackup(trades, balance))], { type: "application/json" });
     const link = document.createElement("a");
@@ -54,8 +57,8 @@ function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language,
         : `The download includes every trade and photo. Upload it here later to restore your backtest without affecting live trades.${cloudConnected ? " Restored trades are saved to the database." : " Keep the file until the database is connected."}`}</p>
       {importStatus && <p className={`backtest-import-status ${importStatus.type}`} role="status">{importStatus.message}</p>}
       <section className="backtest-summary-grid">
-        <div className="backtest-summary-card"><span><BookOpen /> {language === "fa" ? "معاملات ثبت‌شده" : "Recorded trades"}</span><b>{faDigits(trades.length)}</b><small>{language === "fa" ? "فقط در فضای بک‌تست" : "Backtest only"}</small></div>
-        <div className="backtest-summary-card"><span><Target /> {language === "fa" ? "نرخ برد" : "Win rate"}</span><b>{faDigits(winrate)}٪</b><small>{language === "fa" ? "کل معاملات آزمایشی" : "All simulated trades"}</small></div>
+        <div className="backtest-summary-card"><span><BookOpen /> {language === "fa" ? "معاملات انجام‌شده" : "Executed trades"}</span><b>{faDigits(executed.length)}</b><small>{language === "fa" ? `${faDigits(noEntryCount)} فرصت بدون ورود` : `${noEntryCount} no-entry opportunities`}</small></div>
+        <div className="backtest-summary-card"><span><Target /> {language === "fa" ? "نرخ برد" : "Win rate"}</span><b>{faDigits(winrate)}٪</b><small>{language === "fa" ? "فقط معاملات انجام‌شده" : "Executed trades only"}</small></div>
         <div className="backtest-summary-card"><span><TrendingUp /> {language === "fa" ? "نتیجهٔ کل" : "Total result"}</span><b className={total >= 0 ? "green" : "red"}>{money(total)}</b><small>{language === "fa" ? "بدون تأثیر بر حساب لایو" : "No effect on live balance"}</small></div>
         <label className="backtest-summary-card backtest-balance"><span><CircleDollarSign /> {language === "fa" ? "سرمایهٔ فرضی" : "Simulated balance"}</span><div><span>$</span><input type="number" min="0" step="any" value={plan.backtestBalance ?? 0} onChange={(event) => setPlan((current) => ({ ...current, backtestBalance: Number(event.target.value) || 0 }))} /></div><small>{language === "fa" ? "برای محاسبهٔ منحنی و بازده" : "For the equity curve and return"}</small></label>
       </section>
@@ -66,7 +69,7 @@ function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language,
       {tab === "journal" ? (
         <JournalPage month={month} setMonth={setMonth} trades={trades} query={query} onDay={onDay} onTrade={onTrade} hideTitle />
       ) : (
-        <AnalyticsPage trades={trades} equity={equity} winrate={winrate} total={total} profitFactor={profitFactor} accountBalance={balance} mode="backtest" hideTitle />
+        <AnalyticsPage trades={executed} equity={equity} winrate={winrate} total={total} profitFactor={profitFactor} accountBalance={balance} mode="backtest" hideTitle />
       )}
     </div>
   );
@@ -81,7 +84,7 @@ function JournalPage({ month, setMonth, trades, query, onDay, onTrade, hideTitle
     return (
       inMonth &&
       (!query ||
-        [t.market, t.setup, t.notes].some((x) =>
+        [t.market, t.setup, t.notes, t.noEntryReason].some((x) =>
           String(x || "")
             .toLowerCase()
             .includes(query.toLowerCase()),
@@ -99,7 +102,7 @@ function JournalPage({ month, setMonth, trades, query, onDay, onTrade, hideTitle
         <div className="cal-head">
           <PanelHead
             title="تقویم ماهانه"
-            sub={`${faDigits(visible.length)} معامله در این ماه`}
+          sub={`${faDigits(visible.length)} ثبت در این ماه`}
           />
           <MonthNav month={month} setMonth={setMonth} />
         </div>
@@ -139,22 +142,20 @@ function JournalPage({ month, setMonth, trades, query, onDay, onTrade, hideTitle
                       </td>
                       <td data-label="نوع">
                         <span
-                          className={
-                            t.side === "Long" ? "tag-long" : "tag-short"
-                          }
+                          className={isNoEntry(t) ? "tag-no-entry" : t.side === "Long" ? "tag-long" : "tag-short"}
                         >
-                          {t.side}
+                          {isNoEntry(t) ? "ورود نداد" : t.side}
                         </span>
                       </td>
-                      <td data-label="ستاپ">{t.setup || "—"}</td>
+                      <td data-label="ستاپ">{isNoEntry(t) ? t.noEntryReason || "—" : t.setup || "—"}</td>
                       <td data-label="ریسک">
-                        {money(-Math.abs(Number(t.risk || 0)))}
+                        {isNoEntry(t) ? "—" : money(-Math.abs(Number(t.risk || 0)))}
                       </td>
                       <td
                         data-label="نتیجه"
-                        className={Number(t.pnl) >= 0 ? "green" : "red"}
+                        className={isNoEntry(t) ? "no-entry-text" : Number(t.pnl) >= 0 ? "green" : "red"}
                       >
-                        {money(t.pnl)}
+                        {isNoEntry(t) ? "بدون ورود" : money(t.pnl)}
                       </td>
                     </tr>
                   ))

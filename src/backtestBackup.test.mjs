@@ -45,3 +45,12 @@ test("rejects a live backup and invalid images", () => {
   assert.throws(() => parseBacktestBackup(JSON.stringify({ type: "live", balance: 1, trades: [] })));
   assert.throws(() => parseBacktestBackup(JSON.stringify({ type: "backtest", balance: 1, trades: [{ ...trade, images: [{ src: "javascript:alert(1)" }] }] })));
 });
+
+test("a no-entry opportunity retains its reason and photos but cannot add PNL", () => {
+  const opportunity = { ...trade, status: "no-entry", noEntryReason: "No BOS", pnl: 999 };
+  const restored = parseBacktestBackup(JSON.stringify(createBacktestBackup([opportunity], 2500))).trades[0];
+  assert.equal(restored.status, "no-entry");
+  assert.equal(restored.noEntryReason, "No BOS");
+  assert.equal(restored.pnl, 0);
+  assert.deepEqual(restored.images, trade.images);
+});

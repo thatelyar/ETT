@@ -15,11 +15,26 @@ export function backtestImages(trade) {
   return [{ id: "legacy-image", timeframe: "", src: stored }];
 }
 
+export function backtestMetadata(trade) {
+  if (typeof trade?.image !== "string" || !trade.image.startsWith("{")) return {};
+  try {
+    const payload = JSON.parse(trade.image);
+    return payload.status === "no-entry"
+      ? { status: "no-entry", noEntryReason: String(payload.noEntryReason || "") }
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 export function encodeBacktestImages(trade) {
   const images = backtestImages(trade);
-  return images.length
-    ? JSON.stringify({ version: 1, images: images.map(({ id, timeframe, src }) => ({ id, timeframe: timeframe || "", src })) })
-    : "";
+  if (!images.length && trade.status !== "no-entry") return "";
+  return JSON.stringify({
+    version: 2,
+    images: images.map(({ id, timeframe, src }) => ({ id, timeframe: timeframe || "", src })),
+    ...(trade.status === "no-entry" ? { status: "no-entry", noEntryReason: trade.noEntryReason || "" } : {}),
+  });
 }
 
 export function tradePreviewImage(trade) {

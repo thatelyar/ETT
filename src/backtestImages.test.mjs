@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { backtestImages, encodeBacktestImages, tradePreviewImage } from "./backtestImages.mjs";
+import { backtestImages, backtestMetadata, encodeBacktestImages, tradePreviewImage } from "./backtestImages.mjs";
 
 test("four timeframe images round-trip through the existing text field", () => {
   const images = ["4H", "1H", "15M", "5M"].map((timeframe, index) => ({
@@ -16,4 +16,12 @@ test("a legacy single image remains readable and an empty gallery removes it", (
   assert.equal(backtestImages({ image: legacy })[0].src, legacy);
   assert.equal(tradePreviewImage({ image: legacy }), legacy);
   assert.equal(encodeBacktestImages({ image: legacy, images: [] }), "");
+});
+
+test("no-entry reason and gallery survive the existing cloud text field", () => {
+  const trade = { status: "no-entry", noEntryReason: "No BOS", images: [{ id: "h1", timeframe: "1H", src: "data:image/jpeg;base64,a" }] };
+  const stored = { image: encodeBacktestImages(trade) };
+  assert.deepEqual(backtestImages(stored), trade.images);
+  assert.deepEqual(backtestMetadata(stored), { status: "no-entry", noEntryReason: "No BOS" });
+  assert.deepEqual(backtestMetadata({ image: encodeBacktestImages({ ...trade, images: [] }) }), { status: "no-entry", noEntryReason: "No BOS" });
 });

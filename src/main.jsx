@@ -71,6 +71,7 @@ import {
 } from "./sessionGate.mjs";
 import { nextBacktestTradeId } from "./tradeJournal.mjs";
 import { backtestImages, tradePreviewImage } from "./backtestImages.mjs";
+import { executedTrades, isNoEntry } from "./backtestEntries.mjs";
 import { mergeBacktestBackup, parseBacktestBackup } from "./backtestBackup.mjs";
 import { translateUI } from "./translation.mjs";
 import { createJournalViews } from "./journalViews.jsx";
@@ -372,7 +373,7 @@ function App() {
       try {
         localStorage.setItem(
           "tradeflow_trades",
-          JSON.stringify(trades.map((trade) => ({ ...trade, image: "" }))),
+          JSON.stringify(trades.map((trade) => ({ ...trade, image: "", images: [] }))),
         );
       } catch (fallbackError) {
         console.warn("Unable to update the local trade cache", fallbackError);
@@ -538,7 +539,7 @@ function App() {
     backtestMonth,
     accountBalance,
   ]);
-  const monthTrades = useMemo(
+  const monthEntries = useMemo(
     () =>
       trades.filter((t) => {
         const d = new Date(t.date + "T12:00");
@@ -549,6 +550,7 @@ function App() {
       }),
     [trades, month],
   );
+  const monthTrades = useMemo(() => executedTrades(monthEntries), [monthEntries]);
   const total = monthTrades.reduce((s, t) => s + Number(t.pnl || 0), 0),
     wins = monthTrades.filter((t) => Number(t.pnl) > 0),
     losses = monthTrades.filter((t) => Number(t.pnl) < 0);
@@ -562,12 +564,12 @@ function App() {
     : grossProfit
       ? grossProfit
       : 0;
-  const allTimePnl = trades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+  const allTimePnl = executedTrades(trades).reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
   const currentBalance = accountBalance + allTimePnl;
   const equity = useMemo(() => {
     const monthStart = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-01`;
     const previousPnl = trades
-      .filter((trade) => trade.date < monthStart)
+      .filter((trade) => trade.date < monthStart && !isNoEntry(trade))
       .reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
     let v = accountBalance + previousPnl;
     return [
@@ -580,7 +582,7 @@ function App() {
         })),
     ];
   }, [monthTrades, accountBalance, trades, month]);
-  const journalStreak = useMemo(() => getJournalStreak(trades), [trades]);
+  const journalStreak = useMemo(() => getJournalStreak(executedTrades(trades)), [trades]);
   const maxDrawdown = useMemo(() => getMaxDrawdown(equity), [equity]);
   const expectancy = monthTrades.length ? total / monthTrades.length : 0;
   const averageRisk = monthTrades.length
@@ -623,10 +625,11 @@ function App() {
     };
   }, [monthTrades]);
   function save(data) {
+    const entry = { ...data, images: backtestImages(data), image: "", ...(isNoEntry(data) ? { entry: "", exit: "", pnl: 0, risk: "", noEntryReason: data.noEntryReason?.trim() || "" } : { status: "executed", noEntryReason: "" }) };
     setTrades((x) =>
       data.id
-        ? x.map((t) => (t.id === data.id ? data : t))
-        : [...x, { ...data, id: Date.now() }],
+        ? x.map((t) => (t.id === data.id ? entry : t))
+        : [...x, { ...entry, id: Date.now() }],
     );
     setModal(null);
   }
@@ -643,6 +646,9 @@ function App() {
       emotion: "متمرکز",
       notes: "",
       image: "",
+      images: [],
+      status: "executed",
+      noEntryReason: "",
     });
   }
   function openDay(date, dayTrades = []) {
@@ -650,7 +656,7 @@ function App() {
     else newTrade(date);
   }
   function saveBacktest(data) {
-    const withImages = { ...data, images: backtestImages(data), image: "" };
+    const withImages = { ...data, images: backtestImages(data), image: "", ...(isNoEntry(data) ? { entry: "", exit: "", pnl: 0, risk: "", noEntryReason: data.noEntryReason?.trim() || "" } : { status: "executed", noEntryReason: "" }) };
     setBacktestTrades((current) => data.id
       ? current.map((trade) => trade.id === data.id ? withImages : trade)
       : [...current, { ...withImages, id: nextBacktestTradeId(current) }]);
@@ -713,6 +719,8 @@ function App() {
       notes: "",
       image: "",
       images: [],
+      status: "executed",
+      noEntryReason: "",
     });
   }
   function openBacktestDay(date, dayTrades = []) {
@@ -1086,7 +1094,7 @@ function App() {
               </div>
               <Calendar
                 month={month}
-                trades={monthTrades.filter(
+                trades={monthEntries.filter(
                   (t) =>
                     !query ||
                     t.market.toLowerCase().includes(query.toLowerCase()),
@@ -1109,10 +1117,10 @@ function App() {
                       <button key={t.id} onClick={() => setModal(t)}>
                         <span
                           className={
-                            "trade-icon " + (Number(t.pnl) >= 0 ? "up" : "dn")
+                            "trade-icon " + (isNoEntry(t) ? "no-entry" : Number(t.pnl) >= 0 ? "up" : "dn")
                           }
                         >
-                          {Number(t.pnl) >= 0 ? (
+                          {isNoEntry(t) ? <Clock3 /> : Number(t.pnl) >= 0 ? (
                             <TrendingUp />
                           ) : (
                             <TrendingDown />
@@ -1121,12 +1129,12 @@ function App() {
                         <span>
                           <b>{t.market}</b>
                           <small>
-                            {t.side === "Long" ? "خرید" : "فروش"} ·{" "}
+                            {isNoEntry(t) ? "ورود نداد" : t.side === "Long" ? "خرید" : "فروش"} ·{" "}
                             {faDigits(t.date)}
                           </small>
                         </span>
-                        <em className={Number(t.pnl) >= 0 ? "green" : "red"}>
-                          {money(t.pnl)}
+                        <em className={isNoEntry(t) ? "no-entry-text" : Number(t.pnl) >= 0 ? "green" : "red"}>
+                          {isNoEntry(t) ? "بدون ورود" : money(t.pnl)}
                         </em>
                       </button>
                     ))}
@@ -1177,7 +1185,7 @@ function App() {
           )}
           {view === "analytics" && (
             <AnalyticsPage
-              trades={trades}
+              trades={executedTrades(trades)}
               equity={equity}
               winrate={winrate}
               total={total}
@@ -1901,7 +1909,8 @@ function Ring({ value }) {
   );
 }
 function DayTradesModal({ date, trades, onClose, onAdd, onEdit, mode = "live" }) {
-  const total = trades.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
+  const executed = executedTrades(trades);
+  const total = executed.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
   return (
     <div
       className="modal-wrap"
@@ -1913,7 +1922,7 @@ function DayTradesModal({ date, trades, onClose, onAdd, onEdit, mode = "live" })
             <span>{mode === "backtest" ? "معاملات بک‌تست روز" : "معاملات روز"}</span>
             <h2>{faDigits(date)}</h2>
             <p>
-              {faDigits(trades.length)} معامله · نتیجه کل {money(total)}
+              {faDigits(executed.length)} معامله · {faDigits(trades.length - executed.length)} فرصت بدون ورود · نتیجه کل {money(total)}
             </p>
           </div>
           <button onClick={onClose}>
@@ -1925,21 +1934,20 @@ function DayTradesModal({ date, trades, onClose, onAdd, onEdit, mode = "live" })
             <button key={trade.id} onClick={() => onEdit(trade)}>
               <span
                 className={
-                  Number(trade.pnl) >= 0 ? "trade-icon up" : "trade-icon dn"
+                  isNoEntry(trade) ? "trade-icon no-entry" : Number(trade.pnl) >= 0 ? "trade-icon up" : "trade-icon dn"
                 }
               >
-                {Number(trade.pnl) >= 0 ? <TrendingUp /> : <TrendingDown />}
+                {isNoEntry(trade) ? <Clock3 /> : Number(trade.pnl) >= 0 ? <TrendingUp /> : <TrendingDown />}
               </span>
               <span>
-                <small>معامله {faDigits(index + 1)}</small>
+                <small>{isNoEntry(trade) ? "فرصت بدون ورود" : "معامله"} {faDigits(index + 1)}</small>
                 <b dir="ltr">{trade.market}</b>
                 <em>
-                  {trade.side === "Long" ? "خرید" : "فروش"} ·{" "}
-                  {trade.setup || "بدون ستاپ"}
+                  {isNoEntry(trade) ? trade.noEntryReason || "ورود نداد" : `${trade.side === "Long" ? "خرید" : "فروش"} · ${trade.setup || "بدون ستاپ"}`}
                 </em>
               </span>
-              <strong className={Number(trade.pnl) >= 0 ? "green" : "red"}>
-                {money(trade.pnl)}
+              <strong className={isNoEntry(trade) ? "no-entry-text" : Number(trade.pnl) >= 0 ? "green" : "red"}>
+                {isNoEntry(trade) ? "بدون ورود" : money(trade.pnl)}
               </strong>
               <ChevronLeft />
             </button>
@@ -1982,7 +1990,8 @@ function Calendar({ month, trades, onDay }) {
           if (!d) return <div className="day blank" key={i} />;
           const ds = `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
             ts = trades.filter((t) => t.date === ds),
-            p = ts.reduce((s, t) => s + Number(t.pnl || 0), 0),
+            executed = executedTrades(ts),
+            p = executed.reduce((s, t) => s + Number(t.pnl || 0), 0),
             previewImage = tradePreviewImage(ts[0]);
           return (
             <button
@@ -1994,7 +2003,7 @@ function Calendar({ month, trades, onDay }) {
                     ? "profit"
                     : p < 0
                       ? "loss"
-                      : "flat"
+                      : executed.length ? "flat" : "no-entry"
                   : "") +
                 (previewImage ? " has-image" : "")
               }
@@ -2012,12 +2021,12 @@ function Calendar({ month, trades, onDay }) {
                 <>
                   <div className="day-market">
                     {ts[0].market}
-                    <small>{ts[0].side === "Long" ? "خرید" : "فروش"}</small>
+                    <small>{isNoEntry(ts[0]) ? "ورود نداد" : ts[0].side === "Long" ? "خرید" : "فروش"}</small>
                   </div>
-                  <b className="day-pnl">{money(p)}</b>
+                  <b className="day-pnl">{executed.length ? money(p) : "بدون ورود"}</b>
                   {ts.length > 1 && (
                     <em className="trade-count">
-                      {faDigits(ts.length)} معامله
+                      {faDigits(ts.length)} ثبت
                     </em>
                   )}
                   <span className="dot" />
@@ -2037,6 +2046,10 @@ function Calendar({ month, trades, onDay }) {
         <span>
           <i className="loss" />
           زیان‌ده
+        </span>
+        <span>
+          <i className="no-entry" />
+          ورود نداد
         </span>
         <span>
           <i />
@@ -2101,11 +2114,10 @@ function RiskCalculatorModal({ balance, defaultRisk, onClose }) {
 }
 
 function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
-  const [f, setF] = useState(() => mode === "backtest"
-    ? { ...trade, images: backtestImages(trade), image: "" }
-    : trade);
+  const [f, setF] = useState(() => ({ ...trade, images: backtestImages(trade), image: "", status: isNoEntry(trade) ? "no-entry" : "executed", noEntryReason: trade.noEntryReason || "" }));
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
+  const [reasonError, setReasonError] = useState("");
   const put = (k, v) => setF((x) => ({ ...x, [k]: v }));
   async function image(e) {
     const files = Array.from(e.target.files || []);
@@ -2113,16 +2125,12 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
     setImageBusy(true);
     setImageError("");
     try {
-      if (mode === "backtest") {
-        const images = await Promise.all(files.map(async (file, index) => ({
-          id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
-          timeframe: "",
-          src: await prepareTradeImage(file, { maxSide: 1280, quality: 0.72 }),
-        })));
-        setF((current) => ({ ...current, images: [...backtestImages(current), ...images], image: "" }));
-      } else {
-        put("image", await prepareTradeImage(files[0]));
-      }
+      const images = await Promise.all(files.map(async (file, index) => ({
+        id: `${Date.now()}-${index}-${Math.random().toString(36).slice(2, 8)}`,
+        timeframe: "",
+        src: await prepareTradeImage(file, { maxSide: 1280, quality: 0.72 }),
+      })));
+      setF((current) => ({ ...current, images: [...backtestImages(current), ...images], image: "" }));
     } catch (error) {
       console.error(error);
       setImageError("یکی از تصاویر قابل پردازش نیست؛ لطفاً فایل JPG، PNG یا WebP انتخاب کنید.");
@@ -2140,24 +2148,37 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
         className="modal"
         onSubmit={(e) => {
           e.preventDefault();
-          onSave({ ...f, pnl: Number(f.pnl), risk: Number(f.risk) });
+          if (isNoEntry(f) && !f.noEntryReason.trim()) {
+            setReasonError("دلیل ورود ندادن را بنویس.");
+            return;
+          }
+          onSave(isNoEntry(f)
+            ? { ...f, entry: "", exit: "", pnl: 0, risk: "", noEntryReason: f.noEntryReason.trim() }
+            : { ...f, pnl: Number(f.pnl), risk: Number(f.risk) });
         }}
       >
         <div className="modal-head">
           <div>
             <span>{mode === "backtest" ? "ثبت در بک‌تست" : "ثبت در ژورنال"}</span>
-            <h2>{trade.id ? "ویرایش معامله" : mode === "backtest" ? "معامله بک‌تست جدید" : "معامله جدید"}</h2>
-            <p>{faDigits(f.date)} · {mode === "backtest" ? "بدون تأثیر بر حساب لایو" : "اطلاعات معامله را دقیق وارد کنید"}</p>
+            <h2>{trade.id ? "ویرایش ثبت" : isNoEntry(f) ? "فرصت بدون ورود" : mode === "backtest" ? "معامله بک‌تست جدید" : "معامله جدید"}</h2>
+            <p>{faDigits(f.date)} · {isNoEntry(f) ? "در آمار معاملات و موجودی حساب نمی‌شود" : mode === "backtest" ? "بدون تأثیر بر حساب لایو" : "اطلاعات معامله را دقیق وارد کنید"}</p>
           </div>
           <button type="button" onClick={onClose}>
             <X />
           </button>
         </div>
         <div className="modal-body">
-          {mode === "backtest" ? (
+          <div className="entry-status-picker" role="group" aria-label="نتیجهٔ فرصت معاملاتی">
+            <button type="button" className={!isNoEntry(f) ? "active" : ""} aria-pressed={!isNoEntry(f)} onClick={() => put("status", "executed")}>ورود انجام شد</button>
+            <button type="button" className={isNoEntry(f) ? "active" : ""} aria-pressed={isNoEntry(f)} onClick={() => put("status", "no-entry")}>ورود نداد</button>
+          </div>
+          {isNoEntry(f) && <label className="no-entry-reason">چرا ورود ندادی؟
+            <textarea required rows="3" value={f.noEntryReason} onChange={(event) => { put("noEntryReason", event.target.value); setReasonError(""); }} placeholder="مثلاً BOS تأیید نشد، پولبک به FVG نرسید یا نسبت سود به ریسک کافی نبود..." />
+            {reasonError && <small className="image-error" role="alert">{reasonError}</small>}
+          </label>}
             <section className="backtest-images">
               <div className="backtest-images-head">
-                <div><b>تصاویر تایم‌فریم‌ها</b><small>برای این پوزیشن هر تعداد چارت اضافه کن و تایم‌فریم هر عکس را بنویس.</small></div>
+                <div><b>تصاویر تایم‌فریم‌ها</b><small>چارت‌های این {isNoEntry(f) ? "فرصت" : "پوزیشن"} را اضافه کن و تایم‌فریم هر عکس را بنویس.</small></div>
                 <span>{faDigits(backtestImages(f).length)} عکس</span>
               </div>
               <div className="backtest-images-grid">
@@ -2195,37 +2216,12 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
                 <option value="30M" /><option value="15M" /><option value="5M" /><option value="1M" />
               </datalist>
             </section>
-          ) : <div className="wide upload-wrap">
-            <label className="upload">
-              {f.image ? (
-                <img src={f.image} alt="اسکرین‌شات چارت معامله" />
-              ) : (
-                <>
-                  <ImagePlus />
-                  <b>{imageBusy ? "در حال آماده‌سازی تصویر…" : "اسکرین‌شات چارت"}</b>
-                  <small>{imageBusy ? "چند لحظه صبر کنید" : "برای انتخاب تصویر کلیک کنید"}</small>
-                </>
-              )}
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" onChange={image} disabled={imageBusy} />
-            </label>
-            {f.image && (
-              <a
-                className="image-download"
-                href={f.image}
-                download={`ETT-${f.date}-${String(f.market || "trade").replace(/[^a-zA-Z0-9_-]/g, "-")}.png`}
-                onClick={(event) => event.stopPropagation()}
-              >
-                <Download />
-                <span>دانلود عکس</span>
-              </a>
-            )}
-          </div>}
           {imageError && <p className="image-error">{imageError}</p>}
           <div className="form-grid">
-            {mode === "backtest" && <label>
-              تاریخ معامله
+            <label>
+              تاریخ {isNoEntry(f) ? "فرصت" : "معامله"}
               <input type="date" required value={f.date} onChange={(e) => put("date", e.target.value)} />
-            </label>}
+            </label>
             <label>
               بازار
               <input
@@ -2236,7 +2232,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
               />
             </label>
             <label>
-              نوع پوزیشن
+              {isNoEntry(f) ? "جهت موردنظر" : "نوع پوزیشن"}
               <select
                 value={f.side}
                 onChange={(e) => put("side", e.target.value)}
@@ -2245,7 +2241,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
                 <option value="Short">Short — فروش</option>
               </select>
             </label>
-            <label>
+            {!isNoEntry(f) && <><label>
               قیمت ورود
               <input
                 type="number"
@@ -2283,7 +2279,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
                 value={f.risk}
                 onChange={(e) => put("risk", e.target.value)}
               />
-            </label>
+            </label></>}
             <label>
               ستاپ معاملاتی
               <input
@@ -2306,7 +2302,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
               </select>
             </label>
             <label className="wide">
-              یادداشت معامله
+              {isNoEntry(f) ? "یادداشت تکمیلی" : "یادداشت معامله"}
               <textarea
                 rows="4"
                 value={f.notes}
@@ -2327,7 +2323,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
           <button type="button" className="cancel" onClick={onClose}>
             انصراف
           </button>
-          <button className="primary" disabled={imageBusy}>ذخیره معامله</button>
+          <button className="primary" disabled={imageBusy}>ذخیره {isNoEntry(f) ? "فرصت" : "معامله"}</button>
         </div>
       </form>
     </div>

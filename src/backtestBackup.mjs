@@ -1,5 +1,6 @@
 import { backtestImages } from "./backtestImages.mjs";
 import { nextBacktestTradeId } from "./tradeJournal.mjs";
+import { isNoEntry } from "./backtestEntries.mjs";
 
 const imageSourceIsPortable = (src) => /^data:image\/[a-z0-9.+-]+;base64,/i.test(src) || /^https?:\/\//i.test(src);
 
@@ -41,11 +42,16 @@ export function parseBacktestBackup(source) {
       throw new Error(`مشخصات معاملهٔ شمارهٔ ${index + 1} معتبر نیست.`);
     }
     const images = backtestImages(trade);
+    if (isNoEntry(trade) && !String(trade.noEntryReason || "").trim()) {
+      throw new Error(`دلیلِ ورودندادن برای موقعیت شمارهٔ ${index + 1} ثبت نشده است.`);
+    }
     if ((Array.isArray(trade.images) && images.length !== trade.images.length) ||
         images.some((image) => !imageSourceIsPortable(image.src))) {
       throw new Error(`عکس‌های معاملهٔ شمارهٔ ${index + 1} قابل بازیابی نیستند.`);
     }
-    return portableTrade(trade);
+    return portableTrade(isNoEntry(trade)
+      ? { ...trade, entry: "", exit: "", pnl: 0, risk: "", noEntryReason: trade.noEntryReason.trim() }
+      : trade);
   });
   return { balance, trades };
 }
@@ -58,7 +64,9 @@ function tradeSignature(trade) {
     entry: nullableNumber(normalized.entry), exit: nullableNumber(normalized.exit),
     pnl: Number(normalized.pnl || 0), risk: nullableNumber(normalized.risk),
     setup: normalized.setup || "", emotion: normalized.emotion || "",
-    notes: normalized.notes || "", images: normalized.images.map(({ timeframe, src }) => ({ timeframe, src })),
+    notes: normalized.notes || "", status: isNoEntry(normalized) ? "no-entry" : "executed",
+    noEntryReason: isNoEntry(normalized) ? normalized.noEntryReason?.trim() || "" : "",
+    images: normalized.images.map(({ timeframe, src }) => ({ timeframe, src })),
   });
 }
 
