@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { createRoot } from "react-dom/client";
+import { createPortal } from "react-dom";
 import {
   Area,
   AreaChart,
@@ -30,6 +31,7 @@ import {
   Clock3,
   Command,
   Download,
+  Eye,
   Flame,
   FlaskConical,
   Gauge,
@@ -75,6 +77,7 @@ import { executedTrades, isNoEntry } from "./backtestEntries.mjs";
 import { mergeBacktestBackup, parseBacktestBackup } from "./backtestBackup.mjs";
 import { translateUI } from "./translation.mjs";
 import { createJournalViews } from "./journalViews.jsx";
+import PhotoLightbox from "./PhotoLightbox.jsx";
 import "./styles.css";
 import "./theme.css";
 import "./responsive.css";
@@ -1222,6 +1225,7 @@ function App() {
       {modal && (
         <TradeModal
           trade={modal}
+          language={language}
           onSave={save}
           onDelete={
             modal.id
@@ -1238,6 +1242,7 @@ function App() {
         <TradeModal
           key={backtestModal.id || `new-${backtestModal.date}`}
           trade={backtestModal}
+          language={language}
           mode="backtest"
           onSave={saveBacktest}
           onDelete={backtestModal.id ? () => {
@@ -2113,11 +2118,12 @@ function RiskCalculatorModal({ balance, defaultRisk, onClose }) {
   );
 }
 
-function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
+function TradeModal({ trade, onSave, onDelete, onClose, mode = "live", language = "fa" }) {
   const [f, setF] = useState(() => ({ ...trade, images: backtestImages(trade), image: "", status: isNoEntry(trade) ? "no-entry" : "executed", noEntryReason: trade.noEntryReason || "" }));
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
   const [reasonError, setReasonError] = useState("");
+  const [previewIndex, setPreviewIndex] = useState(null);
   const put = (k, v) => setF((x) => ({ ...x, [k]: v }));
   async function image(e) {
     const files = Array.from(e.target.files || []);
@@ -2139,7 +2145,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
       e.target.value = "";
     }
   }
-  return (
+  return (<>
     <div
       className="modal-wrap"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
@@ -2178,13 +2184,16 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
           </label>}
             <section className="backtest-images">
               <div className="backtest-images-head">
-                <div><b>تصاویر تایم‌فریم‌ها</b><small>چارت‌های این {isNoEntry(f) ? "فرصت" : "پوزیشن"} را اضافه کن و تایم‌فریم هر عکس را بنویس.</small></div>
+                <div><b>تصاویر تایم‌فریم‌ها</b><small>برای دیدن عکس در اندازهٔ کامل روی آن بزن؛ می‌توانی تایم‌فریم هر عکس را هم بنویسی.</small></div>
                 <span>{faDigits(backtestImages(f).length)} عکس</span>
               </div>
               <div className="backtest-images-grid">
                 {backtestImages(f).map((item, index) => (
                   <div className="backtest-image-card" key={item.id || `${index}-${item.src.slice(0, 30)}`}>
-                    <img src={item.src} alt={`چارت ${item.timeframe || index + 1}`} />
+                    <button type="button" className="trade-image-preview" onClick={() => setPreviewIndex(index)} aria-label={`نمایش تمام‌صفحهٔ عکس ${item.timeframe || index + 1}`}>
+                      <img src={item.src} alt={`چارت ${item.timeframe || index + 1}`} />
+                      <span><Eye /> پیش‌نمایش</span>
+                    </button>
                     <label>تایم‌فریم
                       <input
                         list="backtest-timeframe-options"
@@ -2199,7 +2208,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
                       />
                     </label>
                     <div className="backtest-image-actions">
-                      <a href={item.src} download={`ETT-backtest-${f.date}-${item.timeframe || index + 1}.jpg`} title="دانلود عکس" aria-label="دانلود عکس"><Download /></a>
+                      <a href={item.src} download={`ETT-${mode}-${f.date}-${item.timeframe || index + 1}.jpg`} title="دانلود عکس" aria-label="دانلود عکس"><Download /></a>
                       <button type="button" onClick={() => setF((current) => ({ ...current, images: backtestImages(current).filter((_, imageIndex) => imageIndex !== index) }))} title="حذف عکس" aria-label="حذف عکس"><Trash2 /></button>
                     </div>
                   </div>
@@ -2327,7 +2336,18 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live" }) {
         </div>
       </form>
     </div>
-  );
+    {previewIndex !== null && createPortal(
+      <PhotoLightbox
+        images={backtestImages(f)}
+        initialIndex={previewIndex}
+        market={f.market}
+        date={f.date}
+        language={language}
+        onClose={() => setPreviewIndex(null)}
+      />,
+      document.body,
+    )}
+  </>);
 }
 createRoot(document.getElementById("root")).render(<App />);
 
