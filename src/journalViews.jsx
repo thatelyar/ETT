@@ -75,7 +75,7 @@ function BacktestPage({ month, setMonth, trades, query, plan, setPlan, language,
   );
 }
 
-function JournalPage({ month, setMonth, trades, query, onDay, onTrade, hideTitle = false }) {
+function JournalPage({ month, setMonth, trades, query, onDay, onTrade, hideTitle = false, liveBackup = null }) {
   const visible = trades.filter((t) => {
     const d = new Date(t.date + "T12:00");
     const inMonth =
@@ -98,6 +98,25 @@ function JournalPage({ month, setMonth, trades, query, onDay, onTrade, hideTitle
         title="همه معاملات، یک‌جا"
         text="روزهای معاملاتی را مرور، جستجو و ویرایش کن."
       />}
+      {liveBackup && <>
+        <div className="backtest-toolbar live-backup-toolbar">
+          <div className="backtest-mode-pill"><ShieldCheck /> {liveBackup.language === "fa" ? "نسخهٔ پشتیبان ژورنال لایو" : "Live journal backup"}</div>
+          <div className="backtest-toolbar-actions">
+            <button type="button" className="backtest-backup" onClick={liveBackup.onDownload}><Download /> {liveBackup.language === "fa" ? "دانلود لایو و عکس‌ها" : "Download live trades & photos"}</button>
+            <label className={`backtest-backup backtest-import ${liveBackup.importBusy ? "busy" : ""}`}><Upload /> {liveBackup.importBusy ? (liveBackup.language === "fa" ? "در حال بازیابی..." : "Restoring...") : (liveBackup.language === "fa" ? "آپلود و بازیابی لایو" : "Upload & restore live")}
+              <input type="file" accept=".json,application/json" disabled={liveBackup.importBusy} onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) liveBackup.onImport(file);
+                event.target.value = "";
+              }} />
+            </label>
+          </div>
+        </div>
+        <p className="backtest-transfer-hint live-backup-hint">{liveBackup.language === "fa"
+          ? `فایل، همهٔ موقعیت‌های لایو (حتی ورودنداده‌ها)، عکس‌ها و سرمایهٔ اولیه را دارد. آپلود فقط موارد جدید را به لایو اضافه می‌کند و به بک‌تست دست نمی‌زند.${liveBackup.cloudConnected ? " بازیابی موفق در پایگاه‌داده ذخیره می‌شود." : " تا زمان اتصال پایگاه‌داده، فایل را نزد خودت نگه دار."}`
+          : `The file includes every live position, photo and starting balance. Restore adds only new live entries and never changes backtests.${liveBackup.cloudConnected ? " Successful restores are saved in the database." : " Keep the file until the database is connected."}`}</p>
+        {liveBackup.importStatus && <p className={`backtest-import-status ${liveBackup.importStatus.type}`} role="status">{liveBackup.importStatus.message}</p>}
+      </>}
       <section className="panel calendar journal-calendar">
         <div className="cal-head">
           <PanelHead

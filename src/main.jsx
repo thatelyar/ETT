@@ -57,6 +57,7 @@ import {
 } from "lucide-react";
 import {
   addCloudBacktestTrades,
+  addCloudLiveTrades,
   cloudEnabled,
   loadCloudData,
   saveCloudSettings,
@@ -71,10 +72,11 @@ import {
   sessionAcknowledgementKey,
   sessionRuleSignature,
 } from "./sessionGate.mjs";
-import { nextBacktestTradeId } from "./tradeJournal.mjs";
+import { nextBacktestTradeId, nextLiveTradeId } from "./tradeJournal.mjs";
 import { backtestImages, tradePreviewImage } from "./backtestImages.mjs";
 import { executedTrades, isNoEntry } from "./backtestEntries.mjs";
 import { mergeBacktestBackup, parseBacktestBackup } from "./backtestBackup.mjs";
+import { createLiveBackup, mergeLiveBackup, parseLiveBackup, reconcileLiveTrades } from "./liveBackup.mjs";
 import { translateUI } from "./translation.mjs";
 import { createJournalViews } from "./journalViews.jsx";
 import PhotoLightbox from "./PhotoLightbox.jsx";
@@ -310,9 +312,13 @@ function App() {
     }
   });
   const [backtestStorageError, setBacktestStorageError] = useState(false);
+  const [liveStorageError, setLiveStorageError] = useState(false);
+  const [liveImportBusy, setLiveImportBusy] = useState(false);
+  const [liveImportStatus, setLiveImportStatus] = useState(null);
   const [backtestImportBusy, setBacktestImportBusy] = useState(false);
   const [backtestImportStatus, setBacktestImportStatus] = useState(null);
   const cloudSavePromise = useRef(Promise.resolve());
+  const liveImportInProgress = useRef(false);
   const backtestImportInProgress = useRef(false);
   const [accountBalance, setAccountBalance] = useState(() =>
     Number(localStorage.getItem("tradeflow_balance") || 0),
@@ -369,10 +375,12 @@ function App() {
   useEffect(() => {
     try {
       localStorage.setItem("tradeflow_trades", JSON.stringify(trades));
+      setLiveStorageError(false);
     } catch (error) {
       // Large screenshots can exceed Safari's small localStorage quota. Cloud
       // sync still keeps the image; the lightweight local copy prevents a crash.
       console.warn("Local trade cache exceeded its quota", error);
+      if (!cloudEnabled) setLiveStorageError(true);
       try {
         localStorage.setItem(
           "tradeflow_trades",
@@ -508,10 +516,10 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session?.user?.id]);
   useEffect(() => {
-    if (!cloudEnabled || !cloudReady || !session?.user?.id || backtestImportBusy) return;
+    if (!cloudEnabled || !cloudReady || !session?.user?.id || backtestImportBusy || liveImportBusy) return;
     setCloudState("saving");
     const timer = window.setTimeout(() => {
-      if (backtestImportInProgress.current) return;
+      if (backtestImportInProgress.current || liveImportInProgress.current) return;
       cloudSavePromise.current = Promise.all([
         saveCloudSettings(session.user.id, { profile, balance: accountBalance, plan }),
         saveCloudTrades(session.user.id, trades),
@@ -524,7 +532,7 @@ function App() {
         });
     }, 700);
     return () => window.clearTimeout(timer);
-  }, [trades, backtestTrades, accountBalance, profile, plan, cloudReady, session?.user?.id, backtestImportBusy]);
+  }, [trades, backtestTrades, accountBalance, profile, plan, cloudReady, session?.user?.id, backtestImportBusy, liveImportBusy]);
   useLayoutEffect(() => {
     if (language === "en") translateUI(appRef.current);
   }, [
@@ -632,7 +640,7 @@ function App() {
     setTrades((x) =>
       data.id
         ? x.map((t) => (t.id === data.id ? entry : t))
-        : [...x, { ...entry, id: Date.now() }],
+        : [...x, { ...entry, id: nextLiveTradeId(x) }],
     );
     setModal(null);
   }
@@ -657,6 +665,77 @@ function App() {
   function openDay(date, dayTrades = []) {
     if (dayTrades.length) setDaySheet({ date });
     else newTrade(date);
+  }
+  function downloadLiveBackup() {
+    try {
+      const blob = new Blob([JSON.stringify(createLiveBackup(trades, accountBalance))], { type: "application/json" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `ETT-live-${new Date().toISOString().slice(0, 10)}.json`;
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(link.href), 60_000);
+      setLiveImportStatus(null);
+    } catch (error) {
+      setLiveImportStatus({ type: "error", message: error.message || "ساخت فایل پشتیبان لایو ناموفق بود." });
+    }
+  }
+  async function importLiveFile(file) {
+    if (liveImportBusy) return;
+    liveImportInProgress.current = true;
+    setLiveImportBusy(true);
+    setLiveImportStatus(null);
+    try {
+      const { balance, trades: imported } = parseLiveBackup(await file.text());
+      if (cloudEnabled) await cloudSavePromise.current;
+      if (cloudEnabled && (!cloudReady || !session?.user?.id)) {
+        throw new Error("اتصال پایگاه‌داده هنوز آماده نیست؛ فایل را نگه دار و دوباره تلاش کن.");
+      }
+      const existing = cloudEnabled
+        ? reconcileLiveTrades(trades, (await loadCloudData(session.user.id)).trades)
+        : trades;
+      const { trades: merged, added, skipped } = mergeLiveBackup(existing, imported);
+      const restoreBalance = existing.length === 0 && Number(accountBalance) === 0 && balance !== 0;
+      let warning = "";
+      if (cloudEnabled) {
+        await addCloudLiveTrades(session.user.id, added);
+      } else {
+        try {
+          localStorage.setItem("tradeflow_trades", JSON.stringify(merged));
+          setLiveStorageError(false);
+        } catch (error) {
+          console.warn("Imported live journal exceeds local browser storage", error);
+          setLiveStorageError(true);
+          warning = "فضای مرورگر برای ذخیرهٔ همهٔ عکس‌ها کافی نیست. فایل بک‌آپ را نگه دار و قبل از بستن صفحه دوباره دانلود کن.";
+        }
+      }
+      setTrades(merged);
+      if (restoreBalance) {
+        if (cloudEnabled) {
+          try {
+            await saveCloudSettings(session.user.id, { profile, balance, plan });
+            setAccountBalance(balance);
+          } catch (error) {
+            console.error("Live balance restore failed", error);
+            warning = "موقعیت‌ها بازیابی شدند، اما سرمایهٔ اولیه در پایگاه‌داده ذخیره نشد. فایل بک‌آپ را نگه دار.";
+          }
+        } else setAccountBalance(balance);
+      }
+      const shownDate = (added[0] || imported[0])?.date;
+      if (shownDate) {
+        const date = new Date(`${shownDate}T12:00:00`);
+        setMonth(new Date(date.getFullYear(), date.getMonth(), 1));
+      }
+      setLiveImportStatus(warning ? { type: "warning", message: warning } : {
+        type: "success",
+        message: `${faDigits(added.length)} موقعیت لایو با عکس‌ها بازیابی شد${skipped ? `؛ ${faDigits(skipped)} مورد تکراری رد شد` : ""}. معاملات بک‌تست تغییر نکردند.${cloudEnabled ? " داده‌ها در پایگاه‌داده ثبت شدند." : " فایل بک‌آپ را برای انتقال بعدی نگه دار."}`,
+      });
+    } catch (error) {
+      console.error(error);
+      setLiveImportStatus({ type: "error", message: error.message || "بازیابی لایو ناموفق بود؛ فایل اصلی تغییر نکرده است." });
+    } finally {
+      liveImportInProgress.current = false;
+      setLiveImportBusy(false);
+    }
   }
   function saveBacktest(data) {
     const withImages = { ...data, images: backtestImages(data), image: "", ...(isNoEntry(data) ? { entry: "", exit: "", pnl: 0, risk: "", noEntryReason: data.noEntryReason?.trim() || "" } : { status: "executed", noEntryReason: "" }) };
@@ -1155,14 +1234,22 @@ function App() {
             </section>
           </div>
           {view === "calendar" && (
-            <JournalPage
+            <><JournalPage
               month={month}
               setMonth={setMonth}
               trades={trades}
               query={query}
               onDay={openDay}
               onTrade={setModal}
+              liveBackup={{
+                language, onDownload: downloadLiveBackup, onImport: importLiveFile,
+                importBusy: liveImportBusy, importStatus: liveImportStatus,
+                cloudConnected: cloudEnabled && cloudReady && cloudState !== "error",
+              }}
             />
+            {liveStorageError && <p className="backtest-storage-alert" role="alert">فضای ذخیره‌سازی مرورگر پر شده است. قبل از بستن صفحه، از ژورنال لایو نسخهٔ پشتیبان بگیر.</p>}
+            {cloudState === "error" && <p className="backtest-storage-alert" role="alert">همگام‌سازی ابری خطا دارد. فایل بک‌آپ لایو را دانلود و نگه‌داری کن.</p>}
+            </>
           )}
           {view === "backtest" && (
             <>

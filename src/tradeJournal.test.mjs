@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   nextBacktestTradeId,
+  nextLiveTradeId,
   partitionJournalTrades,
   tradeBelongsToJournal,
 } from "./tradeJournal.mjs";
@@ -21,4 +22,8 @@ test("new backtest IDs never collide with an existing trade", () => {
   const id = nextBacktestTradeId([{ id: -1720000000000 }], 1720000000000);
   assert.equal(id, -1720000000001);
   assert.equal(tradeBelongsToJournal({ id }, "backtest"), true);
+});
+
+test("new live IDs remain positive and never collide", () => {
+  assert.equal(nextLiveTradeId([{ id: 100 }], 100), 101);
 });

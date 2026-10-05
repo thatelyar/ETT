@@ -111,3 +111,16 @@ export async function addCloudBacktestTrades(userId, trades, signal) {
   const { error } = await query;
   if (error) throw error;
 }
+
+// A live restore only inserts new rows. A collision fails safely instead of
+// overwriting an existing position, and negative (backtest) IDs are rejected.
+export async function addCloudLiveTrades(userId, trades, signal) {
+  if (!trades.every((trade) => tradeBelongsToJournal(trade, "live"))) {
+    throw new Error("Live import included a backtest trade");
+  }
+  if (!trades.length) return;
+  let query = supabase.from("trades").insert(trades.map((trade) => tradeRow(userId, trade, "live")));
+  if (signal) query = query.abortSignal(signal);
+  const { error } = await query;
+  if (error) throw error;
+}

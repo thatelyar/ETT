@@ -18,3 +18,10 @@ export function nextBacktestTradeId(trades, now = Date.now()) {
   while (used.has(id)) id -= 1;
   return id;
 }
+
+export function nextLiveTradeId(trades, now = Date.now()) {
+  const used = new Set(trades.map((trade) => Number(trade.id)));
+  let id = Math.max(1, Math.abs(Math.trunc(now)));
+  while (used.has(id)) id += 1;
+  return id;
+}
