@@ -1289,3 +1289,89 @@ tbody tr:hover,
   .photo-viewer-strip { justify-content: flex-start; }
   .photo-viewer-hint { font-size: 8px; }
 }
+
+/* Keep trade details inside the visual viewport on phones. The previous 10px
+   overlay padding and tiny inherited input text could trigger iOS smart zoom. */
+@media (max-width: 760px) {
+  .trade-modal-wrap,
+  .day-trades-modal-wrap {
+    padding: 0;
+    align-items: end;
+    overflow: hidden;
+    overscroll-behavior: contain;
+  }
+  .trade-modal-wrap > .modal,
+  .day-trades-modal-wrap > .modal {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px));
+    margin: 0;
+    overflow: hidden;
+    border-radius: 18px 18px 0 0;
+  }
+  .trade-modal-wrap .modal-head,
+  .day-trades-modal-wrap .modal-head,
+  .trade-modal-wrap .modal-foot,
+  .day-trades-modal-wrap .modal-foot {
+    flex: 0 0 auto;
+    min-width: 0;
+  }
+  .trade-modal-wrap .modal-head > div,
+  .day-trades-modal-wrap .modal-head > div {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .trade-modal-wrap .modal-body,
+  .day-trades-modal-wrap .day-trades-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+  .trade-modal-wrap .modal-foot,
+  .day-trades-modal-wrap .modal-foot {
+    position: relative;
+    bottom: auto;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .trade-modal-wrap .form-grid label,
+  .trade-modal-wrap .backtest-images-head > div,
+  .day-trades-modal-wrap .day-trades-list > button > span:nth-child(2) {
+    min-width: 0;
+  }
+  .day-trades-modal-wrap .day-trades-list em {
+    overflow-wrap: anywhere;
+  }
+  .journal-table td {
+    overflow-wrap: anywhere;
+  }
+  /* Safari focuses fields under 16px by zooming the entire page. */
+  .app :is(input:not([type="file"], [type="checkbox"], [type="radio"]), select, textarea),
+  .auth-card input {
+    font-size: 16px;
+  }
+  .app .backtest-balance input {
+    font-size: 21px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .day:not(.blank),
+  .journal-table tbody tr,
+  .trade-list button,
+  .day-trades-list > button,
+  .trade-image-preview {
+    touch-action: manipulation;
+  }
+  .day:not(.blank):hover,
+  .trade-list button:hover {
+    transform: none;
+  }
+  .trade-image-preview:hover img {
+    transform: none;
+    filter: none;
+  }
+}

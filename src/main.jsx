@@ -2005,7 +2005,7 @@ function DayTradesModal({ date, trades, onClose, onAdd, onEdit, mode = "live" })
   const total = executed.reduce((sum, trade) => sum + Number(trade.pnl || 0), 0);
   return (
     <div
-      className="modal-wrap"
+      className="modal-wrap day-trades-modal-wrap"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
       <div className="modal day-trades-modal">
@@ -2234,7 +2234,7 @@ function TradeModal({ trade, onSave, onDelete, onClose, mode = "live", language 
   }
   return (<>
     <div
-      className="modal-wrap"
+      className="modal-wrap trade-modal-wrap"
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <form
